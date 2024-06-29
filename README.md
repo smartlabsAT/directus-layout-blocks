@@ -1,9 +1,17 @@
 # Directus Layout Blocks Interface
 
+> ⚠️ **ALPHA VERSION** - This extension is currently in alpha state (v0.0.1)
+> 
+> While each release is functional and tested, this is not yet published to npm and is under active development.
+> 
+> **Current Limitation**: Block creation and editing currently uses direct API requests instead of Directus' native state management system. This will be refactored before the first stable release (v1.0.0).
+
 A powerful and flexible interface for managing content blocks in different layout areas within Directus. This extension allows you to create dynamic, block-based layouts with drag-and-drop functionality, area management, and visual organization of content.
 
 ## Table of Contents
 
+- [Current Status](#current-status)
+- [Roadmap](#roadmap)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -13,6 +21,56 @@ A powerful and flexible interface for managing content blocks in different layou
 - [API Reference](#api-reference)
 - [Development Guide](#development-guide)
 - [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Current Status
+
+### Version: 0.0.1-alpha
+
+This extension is currently in **alpha stage**. While functional and tested, it's not yet ready for production use.
+
+#### ✅ What Works
+- Block creation, editing, and deletion
+- Drag & drop between areas
+- Area management and constraints
+- Visual grid and list views
+- Status management
+- Permission checking
+- Orphaned block handling
+
+#### ⚠️ Current Limitations
+- **API-based state management**: Currently uses direct API calls instead of Directus' native form state management
+- **No npm package**: Must be installed manually
+- **Limited testing**: Only tested with Directus 10.x
+
+#### 🚧 Known Issues
+- State changes require manual API calls
+- No integration with Directus' save/revert system
+- Performance could be optimized for large datasets
+
+## Roadmap
+
+### v0.1.0 - Beta Release (Target: Q3 2025)
+- [ ] Refactor to use Directus native state management
+- [ ] Integration with Directus form save/revert system
+- [ ] Performance optimizations
+- [ ] Comprehensive test suite
+
+### v0.5.0 - Release Candidate (Target: Q3 2025)
+- [ ] npm package publication
+- [ ] Enhanced documentation
+- [ ] Migration guide from alpha versions
+- [ ] Community feedback integration
+
+### v1.0.0 - Stable Release (Target: Q4 2025)
+- [ ] Production-ready state management
+- [ ] Full Directus integration
+- [ ] Stable API
+- [ ] Performance benchmarks
+- [ ] Security audit
+
+See [ROADMAP.md](./ROADMAP.md) for detailed development plans.
 
 ## Features
 

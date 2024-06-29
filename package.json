@@ -1,8 +1,9 @@
 {
   "name": "directus-extension-interface-layout-blocks",
-  "version": "1.0.0",
-  "description": "Universal visual layout interface for M2A relations in Directus",
+  "version": "0.0.1-alpha",
+  "description": "Universal visual layout interface for M2A relations in Directus (Alpha Version)",
   "main": "dist/index.js",
+  "private": true,
   "directus:extension": {
     "type": "interface",
     "path": "dist/index.js",
@@ -28,6 +29,14 @@
   ],
   "author": "Smartlabs Development Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smartlabsAT/directus-layout-blocks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/smartlabsAT/directus-layout-blocks/issues"
+  },
+  "homepage": "https://github.com/smartlabsAT/directus-layout-blocks#readme",
   "dependencies": {
     "@directus/extensions-sdk": "^14.0.0",
     "@directus/stores": "^1.0.2",
