@@ -1,10 +1,22 @@
 # Directus Layout Blocks Interface
 
-> ⚠️ **ALPHA VERSION** - This extension is currently in alpha state (v0.0.1)
+<div align="center">
+
+![Alpha Version](https://img.shields.io/badge/status-alpha-orange.svg)
+![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue.svg)
+![Directus](https://img.shields.io/badge/directus-10.x-64f.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+</div>
+
+> [!WARNING]
+> **ALPHA VERSION** - This extension is currently in alpha state (v0.0.1)
 > 
 > While each release is functional and tested, this is not yet published to npm and is under active development.
 > 
 > **Current Limitation**: Block creation and editing currently uses direct API requests instead of Directus' native state management system. This will be refactored before the first stable release (v1.0.0).
+
+---
 
 A powerful and flexible interface for managing content blocks in different layout areas within Directus. This extension allows you to create dynamic, block-based layouts with drag-and-drop functionality, area management, and visual organization of content.
 
@@ -28,7 +40,8 @@ A powerful and flexible interface for managing content blocks in different layou
 
 ### Version: 0.0.1-alpha
 
-This extension is currently in **alpha stage**. While functional and tested, it's not yet ready for production use.
+> [!CAUTION]
+> This extension is currently in **alpha stage**. While functional and tested, it's not yet ready for production use.
 
 #### ✅ What Works
 - Block creation, editing, and deletion
