@@ -1,61 +1,85 @@
 # Changelog
 
-All notable changes to the Layout Blocks interface will be documented in this file.
+All notable changes to the Directus Layout Blocks interface will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-- Comprehensive documentation (README.md, ARCHITECTURE.md, DEVELOPMENT.md)
-- Utility functions for common operations (blockHelpers.ts)
-- Reusable components (EmptyState, StatusSelector)
-- Drag & Drop composable for shared logic
-- Logger utility with debug mode
-- Visual feedback for invalid drop zones
-- Inline editing in Area Manager
-- Collection management UI in Area Manager
+_No unreleased changes at this time._
 
-### Changed
-- Refactored BlockItem to use shared utilities
-- Improved area management with inline editing
-- Enhanced orphaned blocks handling
-- Better TypeScript typing throughout
-- Consolidated constants and configuration
+## [0.0.1-alpha] - 2024-06-29
 
-### Fixed
-- Orphaned blocks not appearing when areas removed
-- Duplicate orphaned tabs in ListView
-- Drag & drop validation in ListView
-- Area constraints not properly enforced
+**Initial alpha release** 🎉
 
-### Removed
-- Test interface file (test-interface.vue)
-- Excessive console.log statements
-- Duplicate code across components
+This is the first public release of the Directus Layout Blocks interface. While functional, this is an alpha version with known limitations.
 
-## [1.0.0] - 2024-01-10
+### 🚀 Features
 
-### Added
-- Initial release of Layout Blocks interface
-- Grid and List view modes
-- Drag & drop functionality
-- Area management system
-- Content block CRUD operations
-- M2A relationship support
-- Permission-based UI
-- Status workflow (Published, Draft, Archived)
-- Auto-setup for junction fields
-- Orphaned blocks handling
-- Area constraints (maxItems, allowedTypes)
-- Responsive design
+#### Core Functionality
+- **Visual Block Management**: Grid and List views for organizing content blocks
+- **Drag & Drop**: Intuitive drag-and-drop interface for moving blocks between areas
+- **Area Management**: Create and configure layout areas with constraints
+- **Content Types**: Support for any Directus collection through M2A relationships
+- **Status Workflow**: Built-in support for Published, Draft, and Archived statuses
+
+#### Area System
+- Define custom layout areas with specific rules
+- Set maximum items per area
+- Restrict allowed content types per area
+- Visual width configuration (Full, Half, Third, etc.)
+- Locked areas to prevent deletion
+- Automatic orphaned block handling
+
+#### User Interface
+- Responsive grid and list views
 - Dark mode support
+- Empty state indicators
+- Visual feedback during drag operations
+- Status indicators with icons
+- Inline editing capabilities
 
-### Features
-- **Visual Block Management**: Organize content blocks in a visual interface
-- **Flexible Areas**: Define custom layout areas with rules
-- **Drag & Drop**: Move blocks between areas intuitively
-- **Content Types**: Support for any Directus collection
-- **Permissions**: Respects Directus user permissions
-- **Extensible**: Easy to add new view modes and features
+#### Technical Features
+- Auto-setup for required junction fields
+- Permission-based UI elements
+- TypeScript support
+- Modular component architecture
+- Composable-based logic organization
+
+### ⚠️ Known Limitations
+
+This alpha release has the following limitations that will be addressed before v1.0.0:
+
+1. **State Management**: Uses direct API calls instead of Directus' native form state management
+2. **Save/Revert**: No integration with Directus' save and revert system
+3. **Performance**: Not optimized for large datasets (100+ blocks)
+4. **Testing**: Limited test coverage
+5. **Documentation**: Some advanced features not fully documented
+
+### 🛠️ Technical Details
+
+- **Compatibility**: Directus 10.x
+- **Framework**: Vue 3 with Composition API
+- **Language**: TypeScript
+- **Build**: Vite
+- **Style**: Scoped CSS with Directus theme variables
+
+### 📦 Installation
+
+This alpha version must be installed manually:
+
+```bash
+# Copy to your Directus extensions folder
+cp -r layout-blocks /path/to/directus/extensions/interfaces/
+
+# Restart Directus
+```
+
+### 🔄 Migration
+
+No migration needed for fresh installations. This is the initial release.
+
+### 🙏 Acknowledgments
+
+Thanks to all early testers and contributors who helped shape this initial release.
