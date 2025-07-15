@@ -6,7 +6,7 @@ This document outlines the development roadmap for the Directus Layout Blocks ex
 
 ## Version History
 
-### v0.0.1-alpha (Current - June 2024)
+### v0.0.1-alpha (Current - July 2025)
 ✅ **Released**: Initial alpha version
 
 **Features:**
@@ -26,7 +26,7 @@ This document outlines the development roadmap for the Directus Layout Blocks ex
 
 ## Planned Releases
 
-### v0.1.0-alpha (July 2024)
+### v0.1.0-alpha (August 2025)
 🎯 **Goal**: Improve stability and fix critical issues
 
 **Planned Features:**
@@ -44,7 +44,7 @@ This document outlines the development roadmap for the Directus Layout Blocks ex
 
 ---
 
-### v0.2.0-beta (August 2024)
+### v0.2.0-beta (August 2025)
 🎯 **Goal**: Native Directus state management integration
 
 **Major Refactoring:**
@@ -69,7 +69,7 @@ emit('input', updatedValue);
 
 ---
 
-### v0.3.0-beta (September 2024)
+### v0.3.0-beta (September 2025)
 🎯 **Goal**: Performance and UX improvements
 
 **Performance:**
@@ -93,7 +93,7 @@ emit('input', updatedValue);
 
 ---
 
-### v0.4.0-beta (October 2024)
+### v0.4.0-beta (October 2025)
 🎯 **Goal**: Extended features and integrations
 
 **New Features:**
@@ -111,7 +111,7 @@ emit('input', updatedValue);
 
 ---
 
-### v0.5.0-rc (November 2024)
+### v0.5.0-rc (November 2025)
 🎯 **Goal**: Release candidate preparation
 
 **Testing:**
@@ -134,7 +134,7 @@ emit('input', updatedValue);
 
 ---
 
-### v0.6.0-rc (December 2024)
+### v0.6.0-rc (December 2025)
 🎯 **Goal**: Final preparations for stable release
 
 **Polish:**
@@ -151,7 +151,7 @@ emit('input', updatedValue);
 
 ---
 
-### v1.0.0 (January 2025)
+### v1.0.0 (December 2025)
 🎯 **Goal**: First stable release
 
 **Release Criteria:**
@@ -172,7 +172,7 @@ emit('input', updatedValue);
 
 ---
 
-## Future Versions (2025+)
+## Future Versions (2026+)
 
 ### v1.1.0
 - Advanced block types
@@ -187,7 +187,7 @@ emit('input', updatedValue);
 - Performance insights
 
 ### v2.0.0
-- Breaking changes for Directus 11+
+- Breaking changes for Directus >11
 - New architecture
 - Plugin system
 - Custom block types API
