@@ -99,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from '../utils/logger';
 import { ref, computed } from 'vue';
 import type { 
   BlockItem, 
@@ -213,7 +214,7 @@ function selectArea(areaId: string) {
 }
 
 function handleBlockStatusUpdate(block: BlockItem, newStatus: string) {
-  console.log('🟢 GridView: Updating block status', block.id, 'to', newStatus);
+  logger.log('🟢 GridView: Updating block status', block.id, 'to', newStatus);
   
   emit('update-block', { 
     blockId: block.id, 
@@ -459,10 +460,10 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 
 // Add handler for add block button
 function handleAddBlock(areaId: string) {
-  console.log('🟠 GridView: Add block clicked for area:', areaId);
-  console.log('🟠 Current permissions:', props.permissions);
-  console.log('🟠 Area config:', props.areas.find(a => a.id === areaId));
-  console.log('🟠 Current blocks in area:', getAreaBlocks(areaId));
+  logger.log('🟠 GridView: Add block clicked for area:', areaId);
+  logger.log('🟠 Current permissions:', props.permissions);
+  logger.log('🟠 Area config:', props.areas.find(a => a.id === areaId));
+  logger.log('🟠 Current blocks in area:', getAreaBlocks(areaId));
   emit('add-block', areaId);
 }
 </script>

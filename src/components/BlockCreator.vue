@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from '../utils/logger';
 import { ref, computed, watch } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { AreaConfig, JunctionInfo } from '../types';
@@ -163,16 +164,16 @@ const availableAreas = computed(() => {
 });
 
 const availableCollections = computed(() => {
-  console.log('🟤 BlockCreator: Computing available collections...');
-  console.log('🟤 BlockCreator: Allowed collections prop:', props.allowedCollections);
-  console.log('🟤 BlockCreator: Junction info:', props.junctionInfo);
-  console.log('🟤 BlockCreator: Current area:', localArea.value);
+  logger.log('🟤 BlockCreator: Computing available collections...');
+  logger.log('🟤 BlockCreator: Allowed collections prop:', props.allowedCollections);
+  logger.log('🟤 BlockCreator: Junction info:', props.junctionInfo);
+  logger.log('🟤 BlockCreator: Current area:', localArea.value);
   
   let collections: string[] = [];
   
   // If allowedCollections is null, it means use ALL collections
   if (props.allowedCollections === null) {
-    console.log('🟤 BlockCreator: Using all collections from junction info');
+    logger.log('🟤 BlockCreator: Using all collections from junction info');
     // Get all collections from the M2A field configuration
     // For now, use a hardcoded list of common content collections
     collections = [
@@ -186,23 +187,23 @@ const availableCollections = computed(() => {
       'content_block'
     ];
   } else if (Array.isArray(props.allowedCollections) && props.allowedCollections.length > 0) {
-    console.log('🟤 BlockCreator: Using specified allowed collections:', props.allowedCollections);
+    logger.log('🟤 BlockCreator: Using specified allowed collections:', props.allowedCollections);
     collections = props.allowedCollections;
   } else if (props.junctionInfo?.allowedCollections?.length) {
-    console.log('🟤 BlockCreator: Using junction allowed collections:', props.junctionInfo.allowedCollections);
+    logger.log('🟤 BlockCreator: Using junction allowed collections:', props.junctionInfo.allowedCollections);
     collections = props.junctionInfo.allowedCollections;
   } else {
-    console.log('🟤 BlockCreator: Using default collections from collectionInfo');
+    logger.log('🟤 BlockCreator: Using default collections from collectionInfo');
     // Use defaults from collectionInfo
     collections = Object.keys(collectionInfo);
   }
   
-  console.log('🟤 BlockCreator: Collections before area filter:', collections);
+  logger.log('🟤 BlockCreator: Collections before area filter:', collections);
   
   // Filter by area allowed types
   const area = props.areas.find(a => a.id === localArea.value);
   if (area?.allowedTypes?.length) {
-    console.log('🟤 BlockCreator: Area has allowed types:', area.allowedTypes);
+    logger.log('🟤 BlockCreator: Area has allowed types:', area.allowedTypes);
     collections = collections.filter(c => area.allowedTypes!.includes(c));
   }
 
@@ -212,7 +213,7 @@ const availableCollections = computed(() => {
     description: collectionInfo[collection]?.description
   }));
   
-  console.log('🟤 BlockCreator: Final available collections:', result);
+  logger.log('🟤 BlockCreator: Final available collections:', result);
   return result;
 });
 
@@ -233,10 +234,10 @@ function getCollectionLabel(collection: string): string {
 }
 
 async function selectAndCreate(collection: string) {
-  console.log('🟣 BlockCreator: selectAndCreate called with:', collection);
+  logger.log('🟣 BlockCreator: selectAndCreate called with:', collection);
   
   if (!localArea.value) {
-    console.error('🔴 BlockCreator: No area selected');
+    logger.error('🔴 BlockCreator: No area selected');
     return;
   }
 
@@ -264,7 +265,7 @@ async function selectAndCreate(collection: string) {
       }
     }
 
-    console.log('🟣 BlockCreator: Creating block with data:', {
+    logger.log('🟣 BlockCreator: Creating block with data:', {
       area: localArea.value,
       collection: collection,
       item: newItem
@@ -277,7 +278,7 @@ async function selectAndCreate(collection: string) {
     });
 
   } catch (error) {
-    console.error('🔴 BlockCreator: Failed to create block:', error);
+    logger.error('🔴 BlockCreator: Failed to create block:', error);
     creating.value = false;
   }
 }

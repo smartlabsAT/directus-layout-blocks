@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useApi } from '@directus/extensions-sdk';
 import type { UserPermissions } from '../types';
 
@@ -15,13 +16,13 @@ export function usePermissions() {
       // Ensure permissions is an array
       let permissions = response.data.data || response.data || [];
       if (!Array.isArray(permissions)) {
-        console.warn('Permissions response is not an array:', permissions);
+        logger.warn('Permissions response is not an array:', permissions);
         permissions = [];
       }
       
       // If no permissions (might be admin), assume full access
       if (permissions.length === 0) {
-        console.log('No permissions found, assuming admin access');
+        logger.log('No permissions found, assuming admin access');
         return {
           create: true,
           update: true,
@@ -49,7 +50,7 @@ export function usePermissions() {
         manageAreas: fieldPerms.create // Can create fields = can manage areas
       };
     } catch (error) {
-      console.error('Failed to check permissions:', error);
+      logger.error('Failed to check permissions:', error);
       
       // Default to restrictive permissions on error
       return {
@@ -68,7 +69,7 @@ export function usePermissions() {
   ): Record<string, boolean> {
     // Ensure permissions is an array
     if (!Array.isArray(permissions)) {
-      console.warn('getCollectionPermissions: permissions is not an array', permissions);
+      logger.warn('getCollectionPermissions: permissions is not an array', permissions);
       return {
         create: false,
         read: false,
@@ -97,7 +98,7 @@ export function usePermissions() {
       let permissions = response.data.data || response.data || [];
       
       if (!Array.isArray(permissions)) {
-        console.warn('hasPermission: permissions is not an array', permissions);
+        logger.warn('hasPermission: permissions is not an array', permissions);
         return false;
       }
 
@@ -115,7 +116,7 @@ export function usePermissions() {
         return true;
       });
     } catch (error) {
-      console.error('Failed to check permission:', error);
+      logger.error('Failed to check permission:', error);
       return false;
     }
   }

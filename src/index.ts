@@ -1,7 +1,8 @@
+import { logger } from './utils/logger';
 import InterfaceComponent from './interface.vue';
 import { defineInterface } from '@directus/extensions-sdk';
 
-console.log('Layout Blocks Interface: Loading extension');
+logger.log('Layout Blocks Interface: Loading extension');
 
 export default defineInterface({
   id: 'layout-blocks',
@@ -14,31 +15,31 @@ export default defineInterface({
   group: 'relational',
   relational: true,
   options: ({ relations, field }) => {
-    console.log('🔍 === LAYOUT BLOCKS OPTIONS START ===');
-    console.log('🔍 Raw relations:', relations);
-    console.log('🔍 Raw field:', field);
+    logger.log('🔍 === LAYOUT BLOCKS OPTIONS START ===');
+    logger.log('🔍 Raw relations:', relations);
+    logger.log('🔍 Raw field:', field);
     
     // Convert refs to plain objects
     const rels = relations?.value || relations || {};
     const fieldMeta = field?.value || field || {};
     const fieldName = fieldMeta.field;
     
-    console.log('🔍 Unwrapped relations:', rels);
-    console.log('🔍 Unwrapped field:', fieldMeta);
-    console.log('🔍 Field name:', fieldName);
+    logger.log('🔍 Unwrapped relations:', rels);
+    logger.log('🔍 Unwrapped field:', fieldMeta);
+    logger.log('🔍 Field name:', fieldName);
     
     // Debug the structure of relations
     if (rels) {
-      console.log('🔍 Relations keys:', Object.keys(rels));
+      logger.log('🔍 Relations keys:', Object.keys(rels));
       if (rels.m2o) {
-        console.log('🔍 rels.m2o:', rels.m2o);
-        console.log('🔍 rels.m2o.meta:', rels.m2o.meta);
+        logger.log('🔍 rels.m2o:', rels.m2o);
+        logger.log('🔍 rels.m2o.meta:', rels.m2o.meta);
       }
       if (rels.o2m) {
-        console.log('🔍 rels.o2m:', rels.o2m);
-        console.log('🔍 rels.o2m[fieldName]:', rels.o2m[fieldName]);
+        logger.log('🔍 rels.o2m:', rels.o2m);
+        logger.log('🔍 rels.o2m[fieldName]:', rels.o2m[fieldName]);
         if (rels.o2m[fieldName]) {
-          console.log('🔍 rels.o2m[fieldName].meta:', rels.o2m[fieldName].meta);
+          logger.log('🔍 rels.o2m[fieldName].meta:', rels.o2m[fieldName].meta);
         }
       }
     }
@@ -49,15 +50,15 @@ export default defineInterface({
     // Check in m2o.meta for one_allowed_collections
     if (rels.m2o?.meta?.one_allowed_collections) {
       allowedCollections = rels.m2o.meta.one_allowed_collections;
-      console.log('🔍 Found allowed collections in m2o.meta:', allowedCollections);
+      logger.log('🔍 Found allowed collections in m2o.meta:', allowedCollections);
     }
     
     // Debug: Log full m2o.meta structure to understand it better
     if (rels.m2o?.meta) {
-      console.log('🔍 Full m2o.meta structure:', JSON.stringify(rels.m2o.meta, null, 2));
+      logger.log('🔍 Full m2o.meta structure:', JSON.stringify(rels.m2o.meta, null, 2));
     }
     
-    console.log('🔍 Final allowed collections:', allowedCollections);
+    logger.log('🔍 Final allowed collections:', allowedCollections);
     
     // Format allowed collections for use in the interface
     const allowedChoices = Array.isArray(allowedCollections) && allowedCollections.length > 0
@@ -70,8 +71,8 @@ export default defineInterface({
         }))
       : [];
     
-    console.log('🔍 Allowed choices:', allowedChoices);
-    console.log('🔍 === LAYOUT BLOCKS OPTIONS END ===');
+    logger.log('🔍 Allowed choices:', allowedChoices);
+    logger.log('🔍 === LAYOUT BLOCKS OPTIONS END ===');
     
     return [
     {

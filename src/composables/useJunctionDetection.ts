@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useApi } from '@directus/extensions-sdk';
 import type { JunctionInfo } from '../types';
 
@@ -9,7 +10,7 @@ export function useJunctionDetection() {
     field: string
   ): Promise<JunctionInfo> {
     try {
-      console.log(`🔍 Detecting junction structure for ${collection}.${field}`);
+      logger.log(`🔍 Detecting junction structure for ${collection}.${field}`);
       
       // 1. First check if the field exists and is a M2A type
       const fieldResponse = await api.get(`/fields/${collection}/${field}`);
@@ -25,11 +26,11 @@ export function useJunctionDetection() {
       
       // 2. For M2A fields, we need to look at the field metadata directly
       // M2A fields store their junction info in the field metadata, not in relations
-      console.log('Getting field metadata for M2A junction info...');
+      logger.log('Getting field metadata for M2A junction info...');
       
       // Get the field's metadata which contains junction info for M2A
       const fieldMeta = fieldData.meta;
-      console.log('Field metadata:', {
+      logger.log('Field metadata:', {
         interface: fieldMeta?.interface,
         special: fieldMeta?.special,
         junction_collection: fieldMeta?.junction_collection,
@@ -49,7 +50,7 @@ export function useJunctionDetection() {
       
       // If not in field metadata, try to get it from relations
       if (!junctionCollection || oneAllowedCollections.length === 0) {
-        console.log('Getting relations to find junction collection and allowed collections...');
+        logger.log('Getting relations to find junction collection and allowed collections...');
         
         // Get all relations for this field
         const relationsResponse = await api.get('/relations', {
@@ -74,7 +75,7 @@ export function useJunctionDetection() {
         });
         
         const relations = relationsResponse.data.data;
-        console.log(`Found ${relations.length} relations for field`);
+        logger.log(`Found ${relations.length} relations for field`);
         
         // First, try to find the M2A relation directly
         const directM2aRelation = relations.find((r: any) => 
@@ -84,7 +85,7 @@ export function useJunctionDetection() {
         );
         
         if (directM2aRelation) {
-          console.log('Found direct M2A relation:', directM2aRelation);
+          logger.log('Found direct M2A relation:', directM2aRelation);
           
           // Get junction collection from relation
           if (!junctionCollection && directM2aRelation.related_collection) {
@@ -102,7 +103,7 @@ export function useJunctionDetection() {
             } else if (Array.isArray(directM2aRelation.meta.one_allowed_collections)) {
               oneAllowedCollections = directM2aRelation.meta.one_allowed_collections;
             }
-            console.log('Found allowed collections from M2A relation:', oneAllowedCollections);
+            logger.log('Found allowed collections from M2A relation:', oneAllowedCollections);
           }
         }
         
@@ -115,14 +116,14 @@ export function useJunctionDetection() {
         
         // If not found, try alternative approach - look for junction relations
         if (!junctionRelation) {
-          console.log('Primary approach failed, trying alternative...');
+          logger.log('Primary approach failed, trying alternative...');
           // Sometimes the relation is stored differently
           const altRelation = relations.find((rel: any) => {
             return rel.field === field && rel.meta?.special?.includes('m2a');
           });
           
           if (altRelation) {
-            console.log('Found alternative relation:', altRelation);
+            logger.log('Found alternative relation:', altRelation);
             junctionCollection = altRelation.meta?.junction_collection || altRelation.related_collection;
             oneCollectionField = altRelation.meta?.one_collection_field || 'collection';
             oneAllowedCollections = altRelation.meta?.one_allowed_collections || [];
@@ -130,17 +131,17 @@ export function useJunctionDetection() {
         }
         
         if (junctionRelation) {
-          console.log('Found junction relation:', junctionRelation);
+          logger.log('Found junction relation:', junctionRelation);
           junctionCollection = junctionRelation.collection; // This is the junction collection
           oneCollectionField = junctionRelation.meta?.one_collection_field || 'collection';
           oneAllowedCollections = junctionRelation.meta?.one_allowed_collections || [];
           
           // Store junction info from the relation
-          console.log('Storing junction info from relation');
+          logger.log('Storing junction info from relation');
           
           // If no allowed collections in the relation, we need to find them elsewhere
           if (oneAllowedCollections.length === 0) {
-            console.log('No allowed collections in junction relation, checking for O2M relation to junction...');
+            logger.log('No allowed collections in junction relation, checking for O2M relation to junction...');
             
             // For M2A relations created through the UI, there's an O2M relation from
             // the parent collection to the junction table
@@ -151,14 +152,14 @@ export function useJunctionDetection() {
             });
             
             if (o2mRelation) {
-              console.log('Found O2M relation to junction:', o2mRelation);
+              logger.log('Found O2M relation to junction:', o2mRelation);
               // The allowed collections might be in this relation's metadata
               oneAllowedCollections = o2mRelation.meta?.one_allowed_collections || [];
             }
             
             // Still no collections? Check the junction table's relations
             if (oneAllowedCollections.length === 0 && junctionCollection) {
-              console.log('Checking junction table relations...');
+              logger.log('Checking junction table relations...');
               const junctionRelationsResp = await api.get('/relations', {
                 params: {
                   filter: {
@@ -175,7 +176,7 @@ export function useJunctionDetection() {
               
               if (m2aRel?.meta?.one_allowed_collections) {
                 oneAllowedCollections = m2aRel.meta.one_allowed_collections;
-                console.log('Found allowed collections in junction M2A relation:', oneAllowedCollections);
+                logger.log('Found allowed collections in junction M2A relation:', oneAllowedCollections);
               }
             }
           }
@@ -188,7 +189,7 @@ export function useJunctionDetection() {
           );
           
           if (!hasM2AFields) {
-            console.log('Found relation does not appear to be a M2A junction table');
+            logger.log('Found relation does not appear to be a M2A junction table');
             junctionCollection = null;
           } else {
             // If still no allowed collections, try to get them from the junction's collection field
@@ -199,7 +200,7 @@ export function useJunctionDetection() {
                 const allowedValues = collectionField.schema?.allowed_values || 
                                     collectionField.meta?.options?.choices ||
                                     [];
-                console.log('Collection field allowed values:', allowedValues);
+                logger.log('Collection field allowed values:', allowedValues);
                 
                 if (Array.isArray(allowedValues) && allowedValues.length > 0) {
                   oneAllowedCollections = allowedValues;
@@ -211,7 +212,7 @@ export function useJunctionDetection() {
         
         // Alternative: Look for collections that might be junction tables based on naming
         if (!junctionCollection) {
-          console.log('Trying to find junction by naming convention...');
+          logger.log('Trying to find junction by naming convention...');
           const possibleJunctionName = `${collection}_${field}`;
           const altJunctionName = `${collection.replace(/_/g, '')}_${field}`;
           
@@ -226,18 +227,18 @@ export function useJunctionDetection() {
             );
             
             if (foundCollection) {
-              console.log('Found possible junction collection by naming:', foundCollection.collection);
+              logger.log('Found possible junction collection by naming:', foundCollection.collection);
               junctionCollection = foundCollection.collection;
             }
           } catch (e) {
-            console.error('Error checking collections:', e);
+            logger.error('Error checking collections:', e);
           }
         }
       }
       
       if (!junctionCollection) {
         // Debug: Let's see all relations to understand the structure
-        console.log('DEBUG: Could not find junction collection. Dumping all relations...');
+        logger.log('DEBUG: Could not find junction collection. Dumping all relations...');
         const allRelationsResp = await api.get('/relations');
         const allRelations = allRelationsResp.data.data || [];
         const relevantRelations = allRelations.filter((r: any) => 
@@ -246,7 +247,7 @@ export function useJunctionDetection() {
           r.field === field ||
           r.meta?.one_field === field
         );
-        console.log('Relevant relations:', relevantRelations);
+        logger.log('Relevant relations:', relevantRelations);
         
         throw new Error(
           `The M2A field "${field}" is not properly configured. ` +
@@ -260,11 +261,11 @@ export function useJunctionDetection() {
       }
       
       // Junction collection found!
-      console.log(`Found junction collection: ${junctionCollection}`);
+      logger.log(`Found junction collection: ${junctionCollection}`);
       
       // Final attempt to get allowed collections if still empty
       if (oneAllowedCollections.length === 0) {
-        console.log('Still no allowed collections, checking junction relations...');
+        logger.log('Still no allowed collections, checking junction relations...');
         
         // Get all relations FROM the junction table
         const junctionRelationsResp = await api.get('/relations', {
@@ -278,21 +279,21 @@ export function useJunctionDetection() {
         });
         
         const junctionRelations = junctionRelationsResp.data.data || [];
-        console.log('All junction relations:', junctionRelations);
+        logger.log('All junction relations:', junctionRelations);
         
         // Look for the M2A item relation - it should have special: ['m2a']
         const itemRelation = junctionRelations.find((r: any) => 
           r.field === 'item' && r.meta?.special?.includes('m2a')
         );
         
-        console.log('Found item relation:', itemRelation);
+        logger.log('Found item relation:', itemRelation);
         
         if (itemRelation?.meta?.one_allowed_collections) {
           oneAllowedCollections = itemRelation.meta.one_allowed_collections;
-          console.log('Found allowed collections from item relation:', oneAllowedCollections);
+          logger.log('Found allowed collections from item relation:', oneAllowedCollections);
         } else if (itemRelation) {
           // Sometimes the allowed collections are in a different format
-          console.log('Item relation meta:', itemRelation.meta);
+          logger.log('Item relation meta:', itemRelation.meta);
         }
       }
       
@@ -301,7 +302,7 @@ export function useJunctionDetection() {
       const fields = fieldsResponse.data.data || [];
       const fieldNames = fields.map((f: any) => f.field);
       
-      console.log('Junction collection fields:', fields.map((f: any) => ({
+      logger.log('Junction collection fields:', fields.map((f: any) => ({
         field: f.field,
         type: f.type,
         special: f.meta?.special
@@ -309,11 +310,11 @@ export function useJunctionDetection() {
       
       // Final attempt: Check the collection field in the junction table
       if (oneAllowedCollections.length === 0) {
-        console.log('Checking collection field in junction table...');
+        logger.log('Checking collection field in junction table...');
         const collectionField = fields.find((f: any) => f.field === 'collection');
         
         if (collectionField) {
-          console.log('Collection field full details:', {
+          logger.log('Collection field full details:', {
             field: collectionField.field,
             type: collectionField.type,
             schema: collectionField.schema,
@@ -323,19 +324,19 @@ export function useJunctionDetection() {
           // Check if there are enum values (allowed values)
           if (collectionField.schema?.enum) {
             oneAllowedCollections = collectionField.schema.enum;
-            console.log('Found allowed collections from collection field enum:', oneAllowedCollections);
+            logger.log('Found allowed collections from collection field enum:', oneAllowedCollections);
           }
           // Check in meta options
           else if (collectionField.meta?.options?.choices) {
             oneAllowedCollections = collectionField.meta.options.choices.map((c: any) => 
               typeof c === 'string' ? c : c.value
             );
-            console.log('Found allowed collections from collection field choices:', oneAllowedCollections);
+            logger.log('Found allowed collections from collection field choices:', oneAllowedCollections);
           }
           // Check if it's stored as a string constraint in the database
           else if (collectionField.schema?.is_nullable === false && collectionField.schema?.foreign_key_table) {
             // This might be a foreign key constraint
-            console.log('Collection field appears to have FK constraint:', collectionField.schema.foreign_key_table);
+            logger.log('Collection field appears to have FK constraint:', collectionField.schema.foreign_key_table);
           }
         }
       }
@@ -360,7 +361,7 @@ export function useJunctionDetection() {
         allowedCollections: oneAllowedCollections.length > 0 ? oneAllowedCollections : []
       };
       
-      console.log('🎯 Junction detection complete:', {
+      logger.log('🎯 Junction detection complete:', {
         collection: result.collection,
         foreignKeyField: result.foreignKeyField,
         allowedCollections: result.allowedCollections,
@@ -369,7 +370,7 @@ export function useJunctionDetection() {
       
       return result;
     } catch (error) {
-      console.error('Junction detection error:', error);
+      logger.error('Junction detection error:', error);
       throw new Error(`Failed to detect junction structure: ${error.message}`);
     }
   }
@@ -379,7 +380,7 @@ export function useJunctionDetection() {
       const response = await api.get(`/fields/${junctionCollection}`);
       return response.data.data || [];
     } catch (error) {
-      console.error('Failed to get junction fields:', error);
+      logger.error('Failed to get junction fields:', error);
       return [];
     }
   }
@@ -389,7 +390,7 @@ export function useJunctionDetection() {
       const response = await api.get(`/fields/${collection}/${field}`);
       return response.data.data;
     } catch (error) {
-      console.error(`Failed to get field info for ${collection}.${field}:`, error);
+      logger.error(`Failed to get field info for ${collection}.${field}:`, error);
       return null;
     }
   }
@@ -430,7 +431,7 @@ export function useJunctionDetection() {
         uniqueAreas
       };
     } catch (error) {
-      console.error('Failed to analyze existing data:', error);
+      logger.error('Failed to analyze existing data:', error);
       return {
         totalCount: 0,
         hasAreaValues: false,
