@@ -1,6 +1,6 @@
 {
   "name": "directus-extension-interface-layout-blocks",
-  "version": "0.0.1-alpha",
+  "version": "0.0.1",
   "description": "Universal visual layout interface for M2A relations in Directus (Alpha Version)",
   "main": "dist/index.js",
   "private": true,
