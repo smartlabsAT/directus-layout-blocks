@@ -1,4 +1,4 @@
-import { ref, Ref } from 'vue';
+import { ref, type Ref } from 'vue';
 import type { BlockItem, AreaConfig } from '../types';
 import { createDragImage } from '../utils/blockHelpers';
 

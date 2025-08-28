@@ -14,7 +14,7 @@ export default defineInterface({
   localTypes: ['m2a'],
   group: 'relational',
   relational: true,
-  options: ({ relations, field }) => {
+  options: ({ relations, field }: any) => {
     logger.log('🔍 === LAYOUT BLOCKS OPTIONS START ===');
     logger.log('🔍 Raw relations:', relations);
     logger.log('🔍 Raw field:', field);
@@ -22,7 +22,7 @@ export default defineInterface({
     // Convert refs to plain objects
     const rels = relations?.value || relations || {};
     const fieldMeta = field?.value || field || {};
-    const fieldName = fieldMeta.field;
+    const fieldName = fieldMeta?.field;
     
     logger.log('🔍 Unwrapped relations:', rels);
     logger.log('🔍 Unwrapped field:', fieldMeta);
@@ -35,7 +35,7 @@ export default defineInterface({
         logger.log('🔍 rels.m2o:', rels.m2o);
         logger.log('🔍 rels.m2o.meta:', rels.m2o.meta);
       }
-      if (rels.o2m) {
+      if (rels.o2m && fieldName) {
         logger.log('🔍 rels.o2m:', rels.o2m);
         logger.log('🔍 rels.o2m[fieldName]:', rels.o2m[fieldName]);
         if (rels.o2m[fieldName]) {
@@ -45,16 +45,16 @@ export default defineInterface({
     }
     
     // Get M2A allowed collections - they are stored in m2o.meta
-    let allowedCollections = [];
+    let allowedCollections: string[] = [];
     
     // Check in m2o.meta for one_allowed_collections
-    if (rels.m2o?.meta?.one_allowed_collections) {
+    if (rels?.m2o?.meta?.one_allowed_collections) {
       allowedCollections = rels.m2o.meta.one_allowed_collections;
       logger.log('🔍 Found allowed collections in m2o.meta:', allowedCollections);
     }
     
     // Debug: Log full m2o.meta structure to understand it better
-    if (rels.m2o?.meta) {
+    if (rels?.m2o?.meta) {
       logger.log('🔍 Full m2o.meta structure:', JSON.stringify(rels.m2o.meta, null, 2));
     }
     
@@ -62,10 +62,10 @@ export default defineInterface({
     
     // Format allowed collections for use in the interface
     const allowedChoices = Array.isArray(allowedCollections) && allowedCollections.length > 0
-      ? allowedCollections.map(collectionName => ({
+      ? allowedCollections.map((collectionName: string) => ({
           text: collectionName
             .split('_')
-            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
             .join(' '),
           value: collectionName
         }))
@@ -209,14 +209,14 @@ export default defineInterface({
         note: 'Define the available layout areas'
       },
       schema: {
-        default_value: [
+        default_value: JSON.stringify([
           {
             id: 'main',
             label: 'Main Content',
             icon: 'inbox',
             width: 100
           }
-        ]
+        ])
       }
     },
     {
