@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { ref, Ref, computed, ComputedRef, unref } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { 
@@ -27,14 +28,14 @@ export function useBlocks(
    */
   async function loadBlocks(): Promise<void> {
     if (!junctionInfo.value) {
-      console.warn('Junction info not available, cannot load blocks');
+      logger.warn('Junction info not available, cannot load blocks');
       return;
     }
 
     // Skip loading if this is a new item
     const pk = unref(primaryKey);
     if (!pk || pk === '+' || pk === 'new') {
-      console.log('New item detected, skipping block load');
+      logger.log('New item detected, skipping block load');
       blocks.value = [];
       return;
     }
@@ -69,7 +70,7 @@ export function useBlocks(
       );
 
     } catch (err) {
-      console.error('Failed to load blocks:', err);
+      logger.error('Failed to load blocks:', err);
       error.value = err as Error;
       blocks.value = [];
     } finally {
@@ -100,12 +101,12 @@ export function useBlocks(
     itemData: any
   ): Promise<BlockItem> {
     const pk = unref(primaryKey);
-    console.log('🟡 createBlock called with:');
-    console.log('  - area:', area);
-    console.log('  - targetCollection:', targetCollection);
-    console.log('  - itemData:', itemData);
-    console.log('  - primaryKey:', pk);
-    console.log('  - junctionInfo:', junctionInfo.value);
+    logger.log('🟡 createBlock called with:');
+    logger.log('  - area:', area);
+    logger.log('  - targetCollection:', targetCollection);
+    logger.log('  - itemData:', itemData);
+    logger.log('  - primaryKey:', pk);
+    logger.log('  - junctionInfo:', junctionInfo.value);
     
     if (!junctionInfo.value) {
       throw new Error('Junction info not available');
@@ -120,9 +121,9 @@ export function useBlocks(
 
     try {
       // 1. Create the actual content item
-      console.log('🟡 Step 1: Creating content item in collection:', targetCollection);
+      logger.log('🟡 Step 1: Creating content item in collection:', targetCollection);
       const itemResponse = await api.post(`/items/${targetCollection}`, itemData);
-      console.log('🟡 Content item created:', itemResponse.data);
+      logger.log('🟡 Content item created:', itemResponse.data);
       const newItemId = itemResponse.data.data.id;
 
       // 2. Calculate sort position
@@ -130,8 +131,8 @@ export function useBlocks(
       const maxSort = areaBlocks.length > 0 
         ? Math.max(...areaBlocks.map(b => b.sort)) 
         : -1;
-      console.log('🟡 Step 2: Calculated sort position:', maxSort + 1);
-      console.log('  - Area blocks:', areaBlocks);
+      logger.log('🟡 Step 2: Calculated sort position:', maxSort + 1);
+      logger.log('  - Area blocks:', areaBlocks);
 
       // 3. Create junction record
       const junctionData: any = {
@@ -142,21 +143,21 @@ export function useBlocks(
         [sortField.value]: maxSort + 1
       };
       
-      console.log('🟡 Step 3: Creating junction record:');
-      console.log('  - Junction collection:', junctionInfo.value.collection);
-      console.log('  - Junction data:', junctionData);
-      console.log('  - Field mappings:');
-      console.log('    - foreignKeyField:', junctionInfo.value.foreignKeyField, '=', pk);
-      console.log('    - collectionField:', junctionInfo.value.collectionField, '=', targetCollection);
-      console.log('    - itemField:', junctionInfo.value.itemField, '=', newItemId);
-      console.log('    - areaField:', areaField.value, '=', area);
-      console.log('    - sortField:', sortField.value, '=', maxSort + 1);
+      logger.log('🟡 Step 3: Creating junction record:');
+      logger.log('  - Junction collection:', junctionInfo.value.collection);
+      logger.log('  - Junction data:', junctionData);
+      logger.log('  - Field mappings:');
+      logger.log('    - foreignKeyField:', junctionInfo.value.foreignKeyField, '=', pk);
+      logger.log('    - collectionField:', junctionInfo.value.collectionField, '=', targetCollection);
+      logger.log('    - itemField:', junctionInfo.value.itemField, '=', newItemId);
+      logger.log('    - areaField:', areaField.value, '=', area);
+      logger.log('    - sortField:', sortField.value, '=', maxSort + 1);
 
       const junctionResponse = await api.post(
         `/items/${junctionInfo.value.collection}`,
         junctionData
       );
-      console.log('🟡 Junction record created:', junctionResponse.data);
+      logger.log('🟡 Junction record created:', junctionResponse.data);
 
       // 4. Create and add the new block
       const newBlock: BlockItem = {
@@ -167,18 +168,18 @@ export function useBlocks(
         item: itemResponse.data.data,
         _raw: junctionResponse.data.data
       };
-      console.log('🟡 Step 4: Created block object:', newBlock);
+      logger.log('🟡 Step 4: Created block object:', newBlock);
 
       // 5. Update local state
       blocks.value = [...blocks.value, newBlock];
-      console.log('🟡 Step 5: Updated blocks array, new length:', blocks.value.length);
-      console.log('🟡 All blocks:', blocks.value);
+      logger.log('🟡 Step 5: Updated blocks array, new length:', blocks.value.length);
+      logger.log('🟡 All blocks:', blocks.value);
 
       return newBlock;
 
     } catch (err) {
-      console.error('🔴 Failed to create block:', err);
-      console.error('🔴 Error details:', {
+      logger.error('🔴 Failed to create block:', err);
+      logger.error('🔴 Error details:', {
         message: err.message,
         response: err.response?.data,
         status: err.response?.status
@@ -221,7 +222,7 @@ export function useBlocks(
       }
 
     } catch (err) {
-      console.error('Failed to update block:', err);
+      logger.error('Failed to update block:', err);
       throw err;
     }
   }
@@ -325,7 +326,7 @@ export function useBlocks(
       await loadBlocks();
 
     } catch (err) {
-      console.error('Failed to move block:', err);
+      logger.error('Failed to move block:', err);
       throw err;
     } finally {
       loading.value = false;
@@ -356,7 +357,7 @@ export function useBlocks(
         try {
           await api.delete(`/items/${block.collection}/${block.item.id}`);
         } catch (err) {
-          console.warn('Failed to delete related item:', err);
+          logger.warn('Failed to delete related item:', err);
           // Continue even if item deletion fails
         }
       }
@@ -397,7 +398,7 @@ export function useBlocks(
       }
 
     } catch (err) {
-      console.error('Failed to remove block:', err);
+      logger.error('Failed to remove block:', err);
       throw err;
     } finally {
       loading.value = false;
@@ -478,7 +479,7 @@ export function useBlocks(
       });
 
     } catch (err) {
-      console.error('Failed to reorder area:', err);
+      logger.error('Failed to reorder area:', err);
       throw err;
     } finally {
       loading.value = false;

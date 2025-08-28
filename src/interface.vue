@@ -200,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from './utils/logger';
 import { ref, computed, watch, onMounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
 import { useApi, useStores, useCollection } from '@directus/extensions-sdk';
 import { useJunctionDetection } from './composables/useJunctionDetection';
@@ -208,7 +209,6 @@ import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
-import { logger } from './utils/logger';
 import type { 
   LayoutBlocksOptions, 
   JunctionInfo, 
@@ -538,30 +538,30 @@ onMounted(async () => {
   
   // Also check options after a delay to ensure stores are loaded
   setTimeout(() => {
-    console.log('🔍 Delayed options check:');
+    logger.log('🔍 Delayed options check:');
     if (fieldsStore && props.collection && props.field) {
       try {
         const fields = fieldsStore.getFieldsForCollection(props.collection);
         const fieldConfig = fields.find(f => f.field === props.field);
-        console.log('🔍 Field config from store:', fieldConfig);
+        logger.log('🔍 Field config from store:', fieldConfig);
         if (fieldConfig?.meta?.options) {
-          console.log('🔍 Field options from store:', fieldConfig.meta.options);
+          logger.log('🔍 Field options from store:', fieldConfig.meta.options);
           
           // Force recompute if we find options
           if (fieldConfig.meta.options.areas && Array.isArray(fieldConfig.meta.options.areas)) {
-            console.log('🔍 Found areas in field options!', fieldConfig.meta.options.areas);
+            logger.log('🔍 Found areas in field options!', fieldConfig.meta.options.areas);
             // Since we can't use fieldOptions anymore, we need to force a recompute
             // by triggering a reactive update
             // This is a workaround for the delayed loading issue
             if (options.value.areas?.length === 0 || !options.value.areas) {
-              console.log('🔍 Options were empty, will reload page to apply areas');
+              logger.log('🔍 Options were empty, will reload page to apply areas');
               // As a last resort, reload the blocks which should now use the correct areas
               loadBlocks();
             }
           }
         }
       } catch (error) {
-        console.error('🔍 Delayed check error:', error);
+        logger.error('🔍 Delayed check error:', error);
       }
     }
   }, 1000);
@@ -571,7 +571,7 @@ onMounted(async () => {
 async function initialize() {
   loading.value = true;
   
-  console.log('🚀 Interface: Initializing with:', {
+  logger.log('🚀 Interface: Initializing with:', {
     collection: props.collection,
     field: props.field,
     primaryKey: props.primaryKey,
@@ -585,12 +585,12 @@ async function initialize() {
     }
 
     // 1. Detect junction structure
-    console.log('🚀 Interface: Detecting junction structure...');
+    logger.log('🚀 Interface: Detecting junction structure...');
     junctionInfo.value = await detectJunctionStructure(
       props.collection,
       props.field
     );
-    console.log('🚀 Interface: Junction info detected:', junctionInfo.value);
+    logger.log('🚀 Interface: Junction info detected:', junctionInfo.value);
 
     // 2. Ensure required fields exist
     if (options.value.autoSetup) {
@@ -607,7 +607,7 @@ async function initialize() {
     // 3. Validate setup
     const validation = await validateSetup(junctionInfo.value, options.value);
     if (!validation.isValid) {
-      console.warn('Setup validation issues:', validation.issues);
+      logger.warn('Setup validation issues:', validation.issues);
     }
 
     // 4. Check permissions
@@ -622,7 +622,7 @@ async function initialize() {
 
     isSetupComplete.value = true;
   } catch (error) {
-    console.error('Layout Blocks initialization error:', error);
+    logger.error('Layout Blocks initialization error:', error);
     setupError.value = error as Error;
     
     notifications.add({
@@ -645,19 +645,19 @@ async function retrySetup() {
 
 // Open block creator
 function openBlockCreator(area?: string) {
-  console.log('🔵 openBlockCreator called with area:', area);
-  console.log('🔵 Current selectedArea:', selectedArea.value);
-  console.log('🔵 isNewItem:', isNewItem.value);
-  console.log('🔵 primaryKey:', props.primaryKey);
-  console.log('🔵 primaryKey type:', typeof props.primaryKey);
-  console.log('🔵 junctionInfo:', junctionInfo.value);
+  logger.log('🔵 openBlockCreator called with area:', area);
+  logger.log('🔵 Current selectedArea:', selectedArea.value);
+  logger.log('🔵 isNewItem:', isNewItem.value);
+  logger.log('🔵 primaryKey:', props.primaryKey);
+  logger.log('🔵 primaryKey type:', typeof props.primaryKey);
+  logger.log('🔵 junctionInfo:', junctionInfo.value);
   
   // Direct check for new item
   const isNew = !props.primaryKey || props.primaryKey === '+' || props.primaryKey === 'new';
-  console.log('🔵 Direct isNew check:', isNew);
+  logger.log('🔵 Direct isNew check:', isNew);
   
   if (isNew) {
-    console.error('🔴 Cannot open block creator for new items');
+    logger.error('🔴 Cannot open block creator for new items');
     notifications.add({
       title: 'Save Required',  
       text: 'Please save this item before adding blocks',
@@ -667,11 +667,11 @@ function openBlockCreator(area?: string) {
   }
   
   if (area) {
-    console.log('🔵 Setting selectedArea to:', area);
+    logger.log('🔵 Setting selectedArea to:', area);
     selectedArea.value = area;
   }
   
-  console.log('🔵 Opening block creator dialog');
+  logger.log('🔵 Opening block creator dialog');
   showBlockCreator.value = true;
 }
 
@@ -681,15 +681,15 @@ async function handleCreateBlock(data: {
   collection: string;
   item: any;
 }) {
-  console.log('🟢 handleCreateBlock called with:', data);
-  console.log('🟢 Current blocks:', blocks.value);
-  console.log('🟢 Junction info:', junctionInfo.value);
+  logger.log('🟢 handleCreateBlock called with:', data);
+  logger.log('🟢 Current blocks:', blocks.value);
+  logger.log('🟢 Junction info:', junctionInfo.value);
   
   try {
     blocksLoading.value = true;
-    console.log('🟢 Calling createBlock...');
+    logger.log('🟢 Calling createBlock...');
     const newBlock = await createBlock(data.area, data.collection, data.item);
-    console.log('🟢 Block created successfully:', newBlock);
+    logger.log('🟢 Block created successfully:', newBlock);
     
     showBlockCreator.value = false;
     
@@ -699,7 +699,7 @@ async function handleCreateBlock(data: {
       type: 'success'
     });
   } catch (error) {
-    console.error('🔴 Error creating block:', error);
+    logger.error('🔴 Error creating block:', error);
     notifications.add({
       title: 'Error Creating Block',
       text: error.message || 'Failed to create block',
@@ -738,7 +738,7 @@ async function handleUpdateBlock(data: {
   blockId: number;
   updates?: any;
 }) {
-  console.log('🔵 handleUpdateBlock called:', data);
+  logger.log('🔵 handleUpdateBlock called:', data);
   
   // If updates are provided, do a direct update without opening drawer
   if (data.updates) {
@@ -757,7 +757,7 @@ async function handleUpdateBlock(data: {
       throw new Error('Block item ID not found');
     }
     
-    console.log('🔵 Opening Directus drawer for:', {
+    logger.log('🔵 Opening Directus drawer for:', {
       collection: block.collection,
       itemId: block.item.id
     });
@@ -767,17 +767,17 @@ async function handleUpdateBlock(data: {
     editingId.value = block.item.id;
     
     // Load the current values for the form
-    console.log('🔵 Loading block data for edit');
+    logger.log('🔵 Loading block data for edit');
     const response = await api.get(`/items/${block.collection}/${block.item.id}`);
     editingValues.value = response.data.data;
     
-    console.log('🔵 Opening drawer with data:', editingValues.value);
+    logger.log('🔵 Opening drawer with data:', editingValues.value);
     
     // Open drawer
     drawerActive.value = true;
     
   } catch (error) {
-    console.error('🔴 Error opening editor:', error);
+    logger.error('🔴 Error opening editor:', error);
     notifications.add({
       title: 'Error Opening Editor',
       text: error.message || 'Failed to open block editor',
@@ -787,7 +787,7 @@ async function handleUpdateBlock(data: {
 }
 
 async function handleBlockStatusUpdate(blockId: number, newStatus: string) {
-  console.log('🔵 Updating block status:', blockId, 'to', newStatus);
+  logger.log('🔵 Updating block status:', blockId, 'to', newStatus);
   
   try {
     // Find the block
@@ -805,7 +805,7 @@ async function handleBlockStatusUpdate(blockId: number, newStatus: string) {
       status: newStatus
     });
     
-    console.log('✅ Status updated successfully');
+    logger.log('✅ Status updated successfully');
     
     notifications.add({
       title: 'Status Updated',
@@ -822,7 +822,7 @@ async function handleBlockStatusUpdate(blockId: number, newStatus: string) {
     await loadBlocks();
     
   } catch (error: any) {
-    console.error('🔴 Error updating status:', error);
+    logger.error('🔴 Error updating status:', error);
     notifications.add({
       title: 'Error Updating Status',
       text: error.message || 'Failed to update block status',
@@ -921,7 +921,7 @@ async function saveBlockDirectly() {
   editSaving.value = true;
   
   try {
-    console.log('💾 Saving block directly to API:', {
+    logger.log('💾 Saving block directly to API:', {
       collection: editingCollection.value,
       id: editingId.value,
       values: editingValues.value
@@ -930,7 +930,7 @@ async function saveBlockDirectly() {
     // Send PATCH request to update the item
     await api.patch(`/items/${editingCollection.value}/${editingId.value}`, editingValues.value);
     
-    console.log('✅ Block saved successfully');
+    logger.log('✅ Block saved successfully');
     
     notifications.add({
       title: 'Block Updated',
@@ -950,7 +950,7 @@ async function saveBlockDirectly() {
     await loadBlocks();
     
   } catch (error: any) {
-    console.error('🔴 Error saving block:', error);
+    logger.error('🔴 Error saving block:', error);
     notifications.add({
       title: 'Error Saving Block',
       text: error.message || 'Failed to save block',
@@ -1018,18 +1018,18 @@ async function handleDuplicateBlock(blockId: number) {
 
 // Handle areas update from area manager
 async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
-  console.log('Interface: Areas updated:', updatedAreas);
+  logger.log('Interface: Areas updated:', updatedAreas);
   
   try {
     // First, check which blocks need to be orphaned
     const blocksToOrphan: BlockItem[] = [];
     
-    console.log('Interface: Checking blocks for orphaning...');
-    console.log('Interface: Current blocks:', blocks.value);
-    console.log('Interface: Updated areas:', updatedAreas);
+    logger.log('Interface: Checking blocks for orphaning...');
+    logger.log('Interface: Current blocks:', blocks.value);
+    logger.log('Interface: Updated areas:', updatedAreas);
     
     blocks.value.forEach(block => {
-      console.log(`Interface: Checking block ${block.id}:`, {
+      logger.log(`Interface: Checking block ${block.id}:`, {
         area: block.area,
         collection: block.collection,
         blockData: block
@@ -1038,44 +1038,44 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
       if (block.area) {
         // Find the updated area configuration
         const updatedArea = updatedAreas.find(a => a.id === block.area);
-        console.log(`Interface: Found area config for ${block.area}:`, updatedArea);
+        logger.log(`Interface: Found area config for ${block.area}:`, updatedArea);
         
         if (!updatedArea) {
           // Area was removed completely
-          console.log(`Interface: Area ${block.area} was removed, orphaning block ${block.id}`);
+          logger.log(`Interface: Area ${block.area} was removed, orphaning block ${block.id}`);
           blocksToOrphan.push(block);
         } else if (updatedArea.allowedTypes && updatedArea.allowedTypes.length > 0) {
-          console.log(`Interface: Area ${updatedArea.id} has allowed types:`, updatedArea.allowedTypes);
+          logger.log(`Interface: Area ${updatedArea.id} has allowed types:`, updatedArea.allowedTypes);
           // Check if this block's collection is still allowed in the area
           if (!updatedArea.allowedTypes.includes(block.collection)) {
-            console.log(`Interface: Block ${block.id} (${block.collection}) is no longer allowed in area ${block.area}`);
+            logger.log(`Interface: Block ${block.id} (${block.collection}) is no longer allowed in area ${block.area}`);
             blocksToOrphan.push(block);
           } else {
-            console.log(`Interface: Block ${block.id} (${block.collection}) is still allowed in area ${block.area}`);
+            logger.log(`Interface: Block ${block.id} (${block.collection}) is still allowed in area ${block.area}`);
           }
         } else {
-          console.log(`Interface: Area ${block.area} has no type restrictions`);
+          logger.log(`Interface: Area ${block.area} has no type restrictions`);
         }
       } else {
-        console.log(`Interface: Block ${block.id} has no area assigned`);
+        logger.log(`Interface: Block ${block.id} has no area assigned`);
       }
     });
     
     // Orphan blocks that are no longer allowed in their areas
     if (blocksToOrphan.length > 0) {
-      console.log(`Interface: Orphaning ${blocksToOrphan.length} blocks`);
-      console.log('Interface: Blocks to orphan:', blocksToOrphan);
-      console.log('Interface: Junction info:', junctionInfo.value);
-      console.log('Interface: Options:', options.value);
-      console.log('Interface: Will move blocks to "orphaned" area');
+      logger.log(`Interface: Orphaning ${blocksToOrphan.length} blocks`);
+      logger.log('Interface: Blocks to orphan:', blocksToOrphan);
+      logger.log('Interface: Junction info:', junctionInfo.value);
+      logger.log('Interface: Options:', options.value);
+      logger.log('Interface: Will move blocks to "orphaned" area');
       
       for (const block of blocksToOrphan) {
-        console.log(`Interface: Processing block ${block.id} for orphaning`);
+        logger.log(`Interface: Processing block ${block.id} for orphaning`);
         try {
           // Update the junction record to remove its area assignment
           // We need to update the junction table, not the content item
           if (!junctionInfo.value) {
-            console.error('Interface: No junction info available for orphaning!');
+            logger.error('Interface: No junction info available for orphaning!');
             continue;
           }
           
@@ -1083,7 +1083,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
           // Instead of setting to null, move to 'orphaned' area
           const updateData = { [areaField]: 'orphaned' };
           
-          console.log(`Interface: Preparing to orphan block ${block.id}`, {
+          logger.log(`Interface: Preparing to orphan block ${block.id}`, {
             collection: junctionInfo.value.collection,
             blockId: block.id,
             blockData: block,
@@ -1097,7 +1097,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
                 updateData
               );
               
-              console.log(`Interface: Block ${block.id} orphaned successfully`, response);
+              logger.log(`Interface: Block ${block.id} orphaned successfully`, response);
               
               // Update local state immediately
               const blockIndex = blocks.value.findIndex(b => b.id === block.id);
@@ -1105,7 +1105,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
                 blocks.value[blockIndex].area = 'orphaned';
               }
             } catch (patchError: any) {
-              console.error(`Interface: PATCH request failed:`, {
+              logger.error(`Interface: PATCH request failed:`, {
                 url: `/items/${junctionInfo.value.collection}/${block.id}`,
                 updateData: updateData,
                 error: patchError,
@@ -1117,16 +1117,16 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
               throw patchError;
             }
         } catch (error: any) {
-          console.error(`Interface: Error orphaning block ${block.id}:`);
-          console.error('Full error object:', error);
-          console.error('Error message:', error?.message);
+          logger.error(`Interface: Error orphaning block ${block.id}:`);
+          logger.error('Full error object:', error);
+          logger.error('Error message:', error?.message);
           
           // Most importantly, check the API response
           if (error?.response?.data) {
-            console.error('API Error Response:', error.response.data);
+            logger.error('API Error Response:', error.response.data);
             if (error.response.data.errors) {
               error.response.data.errors.forEach((err: any) => {
-                console.error('API Error Detail:', err);
+                logger.error('API Error Detail:', err);
               });
             }
           }
@@ -1153,7 +1153,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
           areas: updatedAreas
         };
         
-        console.log('Interface: Updating field options:', updatedOptions);
+        logger.log('Interface: Updating field options:', updatedOptions);
         
         // Update field via API
         await api.patch(`/fields/${props.collection}/${props.field}`, {
@@ -1182,7 +1182,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
       }
     }
   } catch (error: any) {
-    console.error('Interface: Error saving areas:', error);
+    logger.error('Interface: Error saving areas:', error);
     notifications.add({
       title: 'Error Saving Areas',
       text: error.message || 'Failed to save area configuration',

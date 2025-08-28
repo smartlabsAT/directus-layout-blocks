@@ -258,6 +258,7 @@ function updateStatus(status: string) {
 .block-actions {
   flex-shrink: 0;
   margin-left: auto;
+  position: relative;
 }
 
 :deep(.v-list-item.danger) {

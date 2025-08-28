@@ -247,6 +247,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from '../utils/logger';
 import { ref, computed, onMounted, watch } from 'vue';
 import type {
   BlockItem,
@@ -287,14 +288,14 @@ const draggedBlock = ref<BlockItem | null>(null);
 
 // Lifecycle
 onMounted(() => {
-  console.log('🟣 ListView: Mounted');
-  console.log('  - blocks:', props.blocks);
-  console.log('  - areas:', props.areas);
-  console.log('  - selectedArea:', props.selectedArea);
+  logger.log('🟣 ListView: Mounted');
+  logger.log('  - blocks:', props.blocks);
+  logger.log('  - areas:', props.areas);
+  logger.log('  - selectedArea:', props.selectedArea);
   
   // Auto-select first area if none selected
   if (!props.selectedArea && visibleAreas.value.length > 0) {
-    console.log('🟣 ListView: Auto-selecting first area:', visibleAreas.value[0].id);
+    logger.log('🟣 ListView: Auto-selecting first area:', visibleAreas.value[0].id);
     selectArea(visibleAreas.value[0].id);
   }
 });
@@ -303,29 +304,29 @@ onMounted(() => {
 
 // Computed
 const visibleAreas = computed(() => {
-  console.log('🟣 ListView: Computing visible areas');
-  console.log('  - showEmptyAreas:', props.options.showEmptyAreas);
-  console.log('  - areas:', props.areas);
-  console.log('  - blocks:', props.blocks);
+  logger.log('🟣 ListView: Computing visible areas');
+  logger.log('  - showEmptyAreas:', props.options.showEmptyAreas);
+  logger.log('  - areas:', props.areas);
+  logger.log('  - blocks:', props.blocks);
   
   if (props.options.showEmptyAreas) {
     return props.areas;
   }
   const filtered = props.areas.filter(area => hasBlocks(area.id));
-  console.log('  - filtered areas:', filtered);
+  logger.log('  - filtered areas:', filtered);
   return filtered;
 });
 
 const selectedAreaConfig = computed(() => {
   const config = props.areas.find(a => a.id === props.selectedArea);
-  console.log('🟣 ListView: Selected area config:', config);
+  logger.log('🟣 ListView: Selected area config:', config);
   return config;
 });
 
 const selectedAreaBlocks = computed(() => {
   if (props.selectedArea === null) {
     // Show all blocks
-    console.log('🟣 ListView: Showing all blocks');
+    logger.log('🟣 ListView: Showing all blocks');
     return [...props.blocks].sort((a, b) => {
       // Sort by area first, then by sort order
       if (a.area !== b.area) {
@@ -335,12 +336,12 @@ const selectedAreaBlocks = computed(() => {
     });
   } else if (props.selectedArea === 'orphaned') {
     // Show blocks in orphaned area
-    console.log('🟣 ListView: Showing orphaned blocks');
+    logger.log('🟣 ListView: Showing orphaned blocks');
     return getAreaBlocks('orphaned');
   } else {
     // Show blocks for specific area
     const blocks = getAreaBlocks(props.selectedArea || '');
-    console.log('🟣 ListView: Selected area blocks:', blocks);
+    logger.log('🟣 ListView: Selected area blocks:', blocks);
     return blocks;
   }
 });
@@ -359,7 +360,7 @@ const hasOrphanedArea = computed(() => {
 watch(orphanedBlocks, (newOrphaned, oldOrphaned) => {
   // If we're currently viewing orphaned blocks and they become empty
   if (props.selectedArea === 'orphaned' && oldOrphaned.length > 0 && newOrphaned.length === 0) {
-    console.log('🟣 ListView: No more orphaned blocks, switching to first available area');
+    logger.log('🟣 ListView: No more orphaned blocks, switching to first available area');
     // Switch to first visible area
     if (visibleAreas.value.length > 0) {
       selectArea(visibleAreas.value[0].id);
@@ -388,22 +389,22 @@ const statusOptions = [
 
 // Methods
 function getAreaBlocks(areaId: string): BlockItem[] {
-  console.log(`🟣 ListView: Getting blocks for area '${areaId}'`);
+  logger.log(`🟣 ListView: Getting blocks for area '${areaId}'`);
   const filtered = props.blocks
     .filter(b => b.area === areaId)
     .sort((a, b) => a.sort - b.sort);
-  console.log(`  - Found ${filtered.length} blocks`);
+  logger.log(`  - Found ${filtered.length} blocks`);
   return filtered;
 }
 
 function hasBlocks(areaId: string): boolean {
   const has = props.blocks.some(b => b.area === areaId);
-  console.log(`🟣 ListView: Area '${areaId}' has blocks: ${has}`);
+  logger.log(`🟣 ListView: Area '${areaId}' has blocks: ${has}`);
   return has;
 }
 
 function selectArea(areaId: string | null) {
-  console.log(`🟣 ListView: Selecting area '${areaId}'`);
+  logger.log(`🟣 ListView: Selecting area '${areaId}'`);
   emit('update:selectedArea', areaId);
 }
 
@@ -477,7 +478,7 @@ function confirmRemove(blockId: number) {
 function updateBlockStatus(block: BlockItem, newStatus: string) {
   if (!block.item) return;
   
-  console.log('🟣 ListView: Updating block status', block.id, 'to', newStatus);
+  logger.log('🟣 ListView: Updating block status', block.id, 'to', newStatus);
   
   // Emit update event with status change
   emit('update-block', { 
@@ -615,7 +616,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
   
   // Check if we can drop in this area
   if (!canDropInArea(draggedBlock.value, targetArea)) {
-    console.log('🟣 ListView: Cannot drop block in area:', targetAreaId);
+    logger.log('🟣 ListView: Cannot drop block in area:', targetAreaId);
     return;
   }
   
@@ -625,7 +626,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
   // Don't do anything if dropping on same area
   if (sourceArea === targetAreaId) return;
   
-  console.log('🟣 ListView: Dropping block', blockId, 'from', sourceArea, 'to', targetAreaId);
+  logger.log('🟣 ListView: Dropping block', blockId, 'from', sourceArea, 'to', targetAreaId);
   
   // Check if this is the last orphaned block
   const isLastOrphanedBlock = props.selectedArea === 'orphaned' && orphanedBlocks.value.length === 1;
@@ -640,7 +641,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
   
   // If it was the last orphaned block, switch to the target area
   if (isLastOrphanedBlock) {
-    console.log('🟣 ListView: Last orphaned block moved, switching to area:', targetAreaId);
+    logger.log('🟣 ListView: Last orphaned block moved, switching to area:', targetAreaId);
     selectArea(targetAreaId);
   }
   

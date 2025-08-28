@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useApi, useStores } from '@directus/extensions-sdk';
 import type { JunctionInfo, SetupResult, FieldDefinition, LayoutBlocksOptions } from '../types';
 
@@ -112,7 +113,7 @@ export function useAutoSetup() {
       }
 
     } catch (error) {
-      console.error('Auto setup error:', error);
+      logger.error('Auto setup error:', error);
       errors.push(error as Error);
       
       notifications.add({
@@ -159,7 +160,7 @@ export function useAutoSetup() {
       
       return true;
     } catch (error) {
-      console.error(`Failed to create area field '${fieldName}':`, error);
+      logger.error(`Failed to create area field '${fieldName}':`, error);
       if (error.response?.data?.errors?.[0]?.message?.includes('already exists')) {
         // Field already exists, not an error
         return false;
@@ -195,7 +196,7 @@ export function useAutoSetup() {
       
       return true;
     } catch (error) {
-      console.error(`Failed to create sort field '${fieldName}':`, error);
+      logger.error(`Failed to create sort field '${fieldName}':`, error);
       if (error.response?.data?.errors?.[0]?.message?.includes('already exists')) {
         // Field already exists, not an error
         return false;
@@ -226,7 +227,7 @@ export function useAutoSetup() {
       
       return false;
     } catch (error) {
-      console.error(`Failed to check field compatibility for ${fieldName}:`, error);
+      logger.error(`Failed to check field compatibility for ${fieldName}:`, error);
       return false;
     }
   }
@@ -283,7 +284,7 @@ export function useAutoSetup() {
         }
       }
     } catch (error) {
-      console.error('Failed to set default values:', error);
+      logger.error('Failed to set default values:', error);
       // Not critical, continue
     }
   }
