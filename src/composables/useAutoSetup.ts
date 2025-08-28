@@ -118,7 +118,7 @@ export function useAutoSetup() {
       
       notifications.add({
         title: 'Setup Error',
-        text: error.message || 'Failed to setup required fields',
+        text: (error as Error).message || 'Failed to setup required fields',
         type: 'error',
         persist: true
       });
@@ -161,7 +161,7 @@ export function useAutoSetup() {
       return true;
     } catch (error) {
       logger.error(`Failed to create area field '${fieldName}':`, error);
-      if (error.response?.data?.errors?.[0]?.message?.includes('already exists')) {
+      if ((error as any).response?.data?.errors?.[0]?.message?.includes('already exists')) {
         // Field already exists, not an error
         return false;
       }
@@ -197,7 +197,7 @@ export function useAutoSetup() {
       return true;
     } catch (error) {
       logger.error(`Failed to create sort field '${fieldName}':`, error);
-      if (error.response?.data?.errors?.[0]?.message?.includes('already exists')) {
+      if ((error as any).response?.data?.errors?.[0]?.message?.includes('already exists')) {
         // Field already exists, not an error
         return false;
       }

@@ -371,7 +371,7 @@ export function useJunctionDetection() {
       return result;
     } catch (error) {
       logger.error('Junction detection error:', error);
-      throw new Error(`Failed to detect junction structure: ${error.message}`);
+      throw new Error(`Failed to detect junction structure: ${(error as Error).message}`);
     }
   }
 

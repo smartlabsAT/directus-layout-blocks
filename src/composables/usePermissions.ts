@@ -95,7 +95,7 @@ export function usePermissions() {
   ): Promise<boolean> {
     try {
       const response = await api.get('/permissions/me');
-      let permissions = response.data.data || response.data || [];
+      const permissions = response.data.data || response.data || [];
       
       if (!Array.isArray(permissions)) {
         logger.warn('hasPermission: permissions is not an array', permissions);

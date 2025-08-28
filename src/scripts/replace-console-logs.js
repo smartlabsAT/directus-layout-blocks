@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const glob = require('glob');
+import fs from 'fs';
+import { dirname, join } from 'path';
+import glob from 'glob';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Files to process
 const files = glob.sync('**/*.{ts,vue}', {
-  cwd: path.join(__dirname, '..'),
+  cwd: join(__dirname, '..'),
   ignore: ['**/node_modules/**', '**/dist/**', 'utils/logger.ts', 'scripts/**']
 });
 
 let totalReplaced = 0;
 
 files.forEach(file => {
-  const filePath = path.join(__dirname, '..', file);
+  const filePath = join(__dirname, '..', file);
   let content = fs.readFileSync(filePath, 'utf8');
   let replaced = 0;
   

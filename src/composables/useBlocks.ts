@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { ref, Ref, computed, ComputedRef, unref } from 'vue';
+import { ref, computed, unref, type Ref, type ComputedRef } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import type { 
   BlockItem, 
@@ -180,9 +180,9 @@ export function useBlocks(
     } catch (err) {
       logger.error('🔴 Failed to create block:', err);
       logger.error('🔴 Error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
+        message: (err as Error).message,
+        response: (err as any).response?.data,
+        status: (err as any).response?.status
       });
       throw err;
     } finally {
