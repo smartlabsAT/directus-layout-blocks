@@ -11,8 +11,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: [path.resolve(__dirname, '../test/setup.ts')],
-    include: ['../test/unit/**/*.{test,spec}.{js,ts}', '../src/**/*.{test,spec}.{js,ts}'],
-    exclude: ['../node_modules', '../dist', '../test-output'],
+    include: ['test/unit/**/*.{test,spec}.{js,ts}', 'src/**/*.{test,spec}.{js,ts}'],
+    exclude: ['node_modules', 'dist', 'test-output'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
