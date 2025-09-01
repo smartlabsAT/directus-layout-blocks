@@ -246,7 +246,7 @@
 import { logger } from './utils/logger';
 import { ref, computed, watch, onMounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
 import { useApi, useStores, useCollection } from '@directus/extensions-sdk';
-import { useJunctionDetection } from './composables/useJunctionDetection';
+import { M2AHelper } from './utils/m2a-helper';
 import { useAutoSetup } from './composables/useAutoSetup';
 import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
@@ -409,6 +409,7 @@ const blocksLoading = ref(false);
 const isSetupComplete = ref(false);
 const setupError = ref<Error | null>(null);
 const junctionInfo = ref<JunctionInfo | null>(null);
+const m2aHelper = new M2AHelper(api, stores);
 const viewMode = ref(options.value.viewMode);
 const selectedArea = ref<string | null>(null);
 const showBlockCreator = ref(false);
@@ -463,7 +464,6 @@ const editingCollectionFields = computed(() => {
 });
 
 // Composables
-const { detectJunctionStructure } = useJunctionDetection();
 const { ensureRequiredFields, validateSetup } = useAutoSetup();
 const { checkPermissions } = usePermissions();
 
@@ -535,11 +535,12 @@ const {
   blocks,
   loading: blocksLoadingState,
   loadBlocks,
-  createBlock,
+  addBlock,
+  linkExistingItem,
   updateBlock,
-  moveBlock,
-  removeBlock,
-  duplicateBlock
+  deleteBlock,
+  reorderBlocks,
+  moveBlock
 } = useBlocks(
   props.collection!,
   props.field!,
@@ -654,23 +655,74 @@ async function initialize() {
       throw new Error('Collection and field are required');
     }
 
-    // 1. Detect junction structure
-    logger.log('🚀 Interface: Detecting junction structure...');
-    junctionInfo.value = await detectJunctionStructure(
+    // 1. Detect junction structure using M2AHelper
+    logger.log('🚀 Interface: Detecting junction structure with M2AHelper...');
+    const m2aFieldInfo = await m2aHelper.analyzeM2AStructure(
       props.collection,
       props.field
     );
+    
+    // Get existing fields from junction collection to check what exists
+    let existingFields: string[] = [];
+    let hasAreaField = false;
+    let hasSortField = false;
+    
+    try {
+      const junctionFields = stores.useFieldsStore().getFieldsForCollection(m2aFieldInfo.junctionCollection);
+      existingFields = junctionFields.map((f: any) => f.field);
+      hasAreaField = existingFields.includes('area');
+      hasSortField = existingFields.includes('sort');
+    } catch (e) {
+      logger.debug('Could not get junction fields:', e);
+    }
+    
+    // Convert M2AFieldInfo to JunctionInfo format
+    junctionInfo.value = {
+      collection: m2aFieldInfo.junctionCollection,
+      primaryKeyField: 'id',
+      foreignKeyField: m2aFieldInfo.foreignKeyField,
+      itemField: 'item',
+      collectionField: 'collection',
+      existingFields,
+      hasAreaField,
+      hasSortField,
+      hasCustomFields: false,
+      allowedCollections: m2aFieldInfo.allowedCollections
+    };
     logger.log('🚀 Interface: Junction info detected:', junctionInfo.value);
 
     // 2. Ensure required fields exist
-    if (options.value.autoSetup) {
-      const setupResult = await ensureRequiredFields(
-        junctionInfo.value,
-        options.value
-      );
+    // Skip auto-setup if junction collection already exists with proper fields
+    if (options.value.autoSetup && junctionInfo.value) {
+      // Check if we actually need to create fields
+      const needsSetup = !junctionInfo.value.hasAreaField || !junctionInfo.value.hasSortField;
+      
+      if (needsSetup) {
+        logger.log('🔧 Interface: Setting up missing fields...');
+        try {
+          const setupResult = await ensureRequiredFields(
+            junctionInfo.value,
+            options.value
+          );
 
-      if (!setupResult.success && setupResult.errors.length > 0) {
-        throw setupResult.errors[0];
+          if (!setupResult.success && setupResult.errors.length > 0) {
+            // Only throw if it's not a "field already exists" error
+            const realErrors = setupResult.errors.filter(err => 
+              !err.message?.includes('already exists')
+            );
+            if (realErrors.length > 0) {
+              throw realErrors[0];
+            }
+          }
+        } catch (err: any) {
+          // Ignore 400 errors about fields already existing
+          if (err.response?.status !== 400) {
+            throw err;
+          }
+          logger.log('ℹ️ Fields already exist, continuing...');
+        }
+      } else {
+        logger.log('✅ Junction collection already has all required fields');
       }
     }
 
@@ -757,9 +809,9 @@ async function handleCreateBlock(data: {
   
   try {
     blocksLoading.value = true;
-    logger.log('🟢 Calling createBlock...');
-    const newBlock = await createBlock(data.area, data.collection, data.item);
-    logger.log('🟢 Block created successfully:', newBlock);
+    logger.log('🟢 Calling addBlock...');
+    await addBlock(data.area, data.collection, data.item);
+    logger.log('🟢 Block added successfully');
     
     showBlockCreator.value = false;
     
@@ -790,9 +842,10 @@ async function handleLinkBlocks(data: {
   try {
     blocksLoading.value = true;
     
-    // For each selected item, create a junction record with just the ID
+    // For each selected item, link it using the new linkExistingItem function
     for (const item of data.items) {
-      await createBlock(data.area, data.collection, item.id);
+      logger.log('🔗 Linking item:', item);
+      await linkExistingItem(data.area, data.collection, item.id);
     }
     
     showBlockCreator.value = false;
@@ -803,7 +856,7 @@ async function handleLinkBlocks(data: {
       type: 'success'
     });
   } catch (error) {
-    logger.error('🔴 Error linking blocks:', error);
+    logger.error('Error linking blocks', error);
     notifications.add({
       title: 'Error Linking Items',
       text: error.message || 'Failed to link items',
@@ -834,7 +887,7 @@ async function handleDuplicateBlocks(data: {
       delete itemCopy.user_updated;
       delete itemCopy.date_updated;
       
-      await createBlock(data.area, data.collection, itemCopy);
+      await addBlock(data.area, data.collection, itemCopy);
     }
     
     showBlockCreator.value = false;
@@ -871,7 +924,7 @@ async function handleQuickCreate(data: {
       title: `New ${data.collection.replace(/_/g, ' ')}`
     };
     
-    await createBlock(data.area, data.collection, newItem);
+    await addBlock(data.area, data.collection, newItem);
     
     notifications.add({
       title: 'Block Created',
@@ -962,7 +1015,7 @@ async function handleItemSelectorLinked(items: any[]) {
       
       // For each selected item, create a junction record with just the ID (reference)
       for (const item of items) {
-        await createBlock(selectedArea.value, selectedCollection.value, item.id);
+        await linkExistingItem(selectedArea.value, selectedCollection.value, item.id);
       }
       
       closeItemSelector();
@@ -973,7 +1026,7 @@ async function handleItemSelectorLinked(items: any[]) {
         type: 'success'
       });
     } catch (error) {
-      logger.error('🔴 Error linking blocks:', error);
+      logger.error('Error linking blocks', error);
       notifications.add({
         title: 'Error Linking Items',
         text: error.message || 'Failed to link items',
@@ -1001,7 +1054,7 @@ async function handleItemSelectorDuplicated(items: any[]) {
         delete itemCopy.user_updated;
         delete itemCopy.date_updated;
         
-        await createBlock(selectedArea.value, selectedCollection.value, itemCopy);
+        await addBlock(selectedArea.value, selectedCollection.value, itemCopy);
       }
       
       closeItemSelector();
