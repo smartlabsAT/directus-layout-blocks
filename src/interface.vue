@@ -108,11 +108,14 @@
           :junction-info="junctionInfo"
           :permissions="permissions"
           :loading="blocksLoading"
+          :allowed-collections="allowedCollections"
           @move-block="handleMoveBlock"
           @remove-block="handleRemoveBlock"
           @update-block="handleUpdateBlock"
           @duplicate-block="handleDuplicateBlock"
           @add-block="openBlockCreator"
+          @create-quick="handleQuickCreate"
+          @open-selector="handleOpenSelector"
         />
       </div>
 
@@ -130,10 +133,50 @@
             :allowed-collections="allowedCollections"
             :junction-info="junctionInfo"
             @create="handleCreateBlock"
+            @link="handleLinkBlocks"
+            @duplicate="handleDuplicateBlocks"
             @cancel="showBlockCreator = false"
           />
         </template>
       </v-dialog>
+      
+      <!-- ItemSelector Drawer -->
+      <Teleport to="body">
+        <ItemSelectorDrawer
+          v-if="showItemSelector"
+          :open="showItemSelector"
+          :collection="selectedCollection"
+          :collection-name="getCollectionLabel(selectedCollection)"
+          :collection-icon="getCollectionIcon(selectedCollection)"
+          :items="itemSelectorItems"
+          :loading="itemSelectorLoading"
+          :loading-details="itemSelectorLoadingDetails"
+          :current-page="itemSelectorCurrentPage"
+          :items-per-page="itemSelectorItemsPerPage"
+          :total-items="itemSelectorTotalItems"
+          :available-fields="itemSelectorAvailableFields"
+          :item-relations="itemSelectorRelations"
+          :api-error="itemSelectorError"
+          :translation-info="itemSelectorTranslationInfo"
+          :selected-language="itemSelectorSelectedLanguage"
+          :available-languages="itemSelectorAvailableLanguages"
+          :get-translated-field-value="getTranslatedFieldValue"
+          :is-field-translatable="isFieldTranslatable"
+          :allow-link="true"
+          :allow-duplicate="true"
+          :sort-field="itemSelectorSortField"
+          :sort-direction="itemSelectorSortDirection"
+          :logger-prefix="'[LayoutBlocks]'"
+          @close="closeItemSelector"
+          @confirm="handleItemSelectorLinked"
+          @confirm-copy="handleItemSelectorDuplicated"
+          @search="handleItemSelectorSearch"
+          @update:current-page="handleItemSelectorPageChange"
+          @update:selected-language="handleItemSelectorLanguageChange"
+          @update:sort="handleItemSelectorSortChange"
+          @update:items-per-page="handleItemSelectorItemsPerPageChange"
+        />
+      </Teleport>
       
       <!-- Edit Drawer mit v-form und eigenen Buttons -->
       <v-drawer
@@ -221,6 +264,7 @@ import GridView from './components/GridView.vue';
 import ListView from './components/ListView.vue';
 import AreaManager from './components/AreaManager.vue';
 import BlockCreator from './components/BlockCreator.vue';
+import { useItemSelector, ItemSelectorDrawer } from 'directus-extension-expandable-blocks/shared';
 
 // Props - Using plain defineProps to ensure all props are received
 const props = defineProps({
@@ -370,10 +414,36 @@ const selectedArea = ref<string | null>(null);
 const showBlockCreator = ref(false);
 const showAreaManager = ref(false);
 const customAreas = ref<AreaConfig[]>([]);
+const showItemSelector = ref(false);
+const selectedCollection = ref<string>('');
 const drawerActive = ref(false);
 const editingId = ref<string | number | null>(null);
 const editingCollection = ref<string>('');
 const editingValues = ref<any>({});
+
+// ItemSelector state
+const itemSelector = useItemSelector(api, [selectedCollection.value], {
+  loggerPrefix: '[LayoutBlocks]',
+  allowLink: true,
+  allowDuplicate: true,
+  defaultItemsPerPage: 50
+});
+
+// ItemSelector computed properties (proxies to composable)
+const itemSelectorItems = computed(() => itemSelector.availableItems.value);
+const itemSelectorLoading = computed(() => itemSelector.loading.value);
+const itemSelectorLoadingDetails = computed(() => itemSelector.loadingDetails.value);
+const itemSelectorCurrentPage = computed(() => itemSelector.currentPage.value);
+const itemSelectorItemsPerPage = computed(() => itemSelector.itemsPerPage.value);
+const itemSelectorTotalItems = computed(() => itemSelector.totalItems.value);
+const itemSelectorAvailableFields = computed(() => itemSelector.availableFields.value);
+const itemSelectorRelations = computed(() => itemSelector.itemRelations.value);
+const itemSelectorError = computed(() => itemSelector.apiError.value);
+const itemSelectorTranslationInfo = computed(() => itemSelector.translationInfo.value);
+const itemSelectorSelectedLanguage = computed(() => itemSelector.selectedLanguage.value);
+const itemSelectorAvailableLanguages = computed(() => itemSelector.availableLanguages.value);
+const itemSelectorSortField = computed(() => itemSelector.sortField.value);
+const itemSelectorSortDirection = computed(() => itemSelector.sortDirection.value);
 const editSaving = ref(false);
 const editForm = ref<any>(null);
 const fieldOptions = ref<any>(null);
@@ -707,6 +777,250 @@ async function handleCreateBlock(data: {
     });
   } finally {
     blocksLoading.value = false;
+  }
+}
+
+async function handleLinkBlocks(data: {
+  area: string;
+  collection: string;
+  items: any[];
+}) {
+  logger.log('🟢 handleLinkBlocks called with:', data);
+  
+  try {
+    blocksLoading.value = true;
+    
+    // For each selected item, create a junction record with just the ID
+    for (const item of data.items) {
+      await createBlock(data.area, data.collection, item.id);
+    }
+    
+    showBlockCreator.value = false;
+    
+    notifications.add({
+      title: 'Items Linked',
+      text: `${data.items.length} item(s) have been linked successfully`,
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('🔴 Error linking blocks:', error);
+    notifications.add({
+      title: 'Error Linking Items',
+      text: error.message || 'Failed to link items',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleDuplicateBlocks(data: {
+  area: string;
+  collection: string;
+  items: any[];
+}) {
+  logger.log('🟢 handleDuplicateBlocks called with:', data);
+  
+  try {
+    blocksLoading.value = true;
+    
+    // For each selected item, create a new item with copied data
+    for (const item of data.items) {
+      // Remove system fields from the copy
+      const itemCopy = { ...item };
+      delete itemCopy.id;
+      delete itemCopy.user_created;
+      delete itemCopy.date_created;
+      delete itemCopy.user_updated;
+      delete itemCopy.date_updated;
+      
+      await createBlock(data.area, data.collection, itemCopy);
+    }
+    
+    showBlockCreator.value = false;
+    
+    notifications.add({
+      title: 'Items Duplicated',
+      text: `${data.items.length} item(s) have been duplicated successfully`,
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('🔴 Error duplicating blocks:', error);
+    notifications.add({
+      title: 'Error Duplicating Items',
+      text: error.message || 'Failed to duplicate items',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleQuickCreate(data: {
+  area: string;
+  collection: string;
+}) {
+  logger.log('🟢 handleQuickCreate called with:', data);
+  
+  try {
+    blocksLoading.value = true;
+    
+    // Create a new empty item with default values
+    const newItem = {
+      status: 'draft',
+      title: `New ${data.collection.replace(/_/g, ' ')}`
+    };
+    
+    await createBlock(data.area, data.collection, newItem);
+    
+    notifications.add({
+      title: 'Block Created',
+      text: 'New block has been created',
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('🔴 Error creating block:', error);
+    notifications.add({
+      title: 'Error Creating Block',
+      text: error.message || 'Failed to create block',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleOpenSelector(data: {
+  area: string;
+  collection: string;
+}) {
+  logger.log('🔵 handleOpenSelector called with:', data);
+  
+  // Store the selected area and collection for later use
+  selectedArea.value = data.area;
+  selectedCollection.value = data.collection;
+  
+  // Open the ItemSelector with the selected collection
+  itemSelector.open(data.collection);
+  showItemSelector.value = true;
+}
+
+// ItemSelector event handlers
+function closeItemSelector() {
+  showItemSelector.value = false;
+  itemSelector.close();
+}
+
+function handleItemSelectorSearch(query: string) {
+  itemSelector.handleSearch(query);
+}
+
+function handleItemSelectorPageChange(page: number) {
+  itemSelector.handlePageChange(page);
+}
+
+function handleItemSelectorLanguageChange(language: string) {
+  itemSelector.selectedLanguage.value = language;
+}
+
+function handleItemSelectorSortChange(field: string, direction: 'asc' | 'desc') {
+  itemSelector.updateSort(field, direction);
+}
+
+function handleItemSelectorItemsPerPageChange(count: number) {
+  itemSelector.updateItemsPerPage(count);
+}
+
+function getTranslatedFieldValue(item: any, field: string): any {
+  return itemSelector.getTranslatedFieldValue(item, field);
+}
+
+function isFieldTranslatable(field: string): boolean {
+  return itemSelector.isFieldTranslatable(field);
+}
+
+function getCollectionIcon(collection: string): string {
+  const collectionInfo: Record<string, any> = {
+    content_headline: { icon: 'title' },
+    content_text: { icon: 'text_fields' },
+    content_image: { icon: 'image' },
+    content_video: { icon: 'videocam' },
+    content_cta: { icon: 'ads_click' },
+    content_button: { icon: 'smart_button' },
+    content_wysiwig: { icon: 'edit_note' },
+    content_block: { icon: 'widgets' }
+  };
+  return collectionInfo[collection]?.icon || 'widgets';
+}
+
+async function handleItemSelectorLinked(items: any[]) {
+  logger.log('🟢 handleItemSelectorLinked called with:', items);
+  
+  if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    try {
+      blocksLoading.value = true;
+      
+      // For each selected item, create a junction record with just the ID (reference)
+      for (const item of items) {
+        await createBlock(selectedArea.value, selectedCollection.value, item.id);
+      }
+      
+      closeItemSelector();
+      
+      notifications.add({
+        title: 'Items Linked',
+        text: `${items.length} item(s) have been linked successfully`,
+        type: 'success'
+      });
+    } catch (error) {
+      logger.error('🔴 Error linking blocks:', error);
+      notifications.add({
+        title: 'Error Linking Items',
+        text: error.message || 'Failed to link items',
+        type: 'error'
+      });
+    } finally {
+      blocksLoading.value = false;
+    }
+  }
+}
+
+async function handleItemSelectorDuplicated(items: any[]) {
+  logger.log('🟢 handleItemSelectorDuplicated called with:', items);
+  
+  if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    try {
+      blocksLoading.value = true;
+      
+      // For each selected item, create a new block with copied data
+      for (const item of items) {
+        const itemCopy = { ...item };
+        delete itemCopy.id;
+        delete itemCopy.user_created;
+        delete itemCopy.date_created;
+        delete itemCopy.user_updated;
+        delete itemCopy.date_updated;
+        
+        await createBlock(selectedArea.value, selectedCollection.value, itemCopy);
+      }
+      
+      closeItemSelector();
+      
+      notifications.add({
+        title: 'Items Duplicated',
+        text: `${items.length} item(s) have been duplicated successfully`,
+        type: 'success'
+      });
+    } catch (error) {
+      logger.error('🔴 Error duplicating blocks:', error);
+      notifications.add({
+        title: 'Error Duplicating Items',
+        text: error.message || 'Failed to duplicate items',
+        type: 'error'
+      });
+    } finally {
+      blocksLoading.value = false;
+    }
   }
 }
 
