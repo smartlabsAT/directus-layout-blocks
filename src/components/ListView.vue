@@ -44,17 +44,15 @@
       <!-- Orphaned Area Tab is now included in visibleAreas from parent component -->
       <!-- No need to manually add it here anymore -->
       
-      <v-button
-        v-if="permissions.create"
-        v-tooltip="'Add new block'"
-        icon
-        small
-        rounded
-        class="add-button"
-        @click="$emit('add-block', selectedArea)"
-      >
-        <v-icon name="add" />
-      </v-button>
+      <AddBlockDropdown
+        v-if="permissions.create && selectedArea"
+        :area="selectedArea"
+        :allowed-collections="allowedCollections"
+        size="small"
+        variant="secondary"
+        @create-block="$emit('create-quick', $event)"
+        @open-selector="$emit('open-selector', $event)"
+      />
     </div>
 
     <!-- Selected Area Content -->
@@ -249,6 +247,7 @@
 <script setup lang="ts">
 import { logger } from '../utils/logger';
 import { ref, computed, onMounted, watch } from 'vue';
+import AddBlockDropdown from './AddBlockDropdown.vue';
 import type {
   BlockItem,
   AreaConfig,
@@ -264,6 +263,7 @@ interface Props {
   options: LayoutBlocksOptions;
   permissions: UserPermissions;
   loading?: boolean;
+  allowedCollections?: string[] | null;
 }
 
 const props = defineProps<Props>();
@@ -281,6 +281,8 @@ const emit = defineEmits<{
   'duplicate-block': [blockId: number];
   'update-block': [data: { blockId: number; updates?: any }];
   'add-block': [area?: string];
+  'create-quick': [data: { area: string; collection: string }];
+  'open-selector': [data: { area: string; collection: string }];
 }>();
 
 // Local State
