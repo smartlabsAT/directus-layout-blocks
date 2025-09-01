@@ -27,9 +27,6 @@
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-text>{{ collection.label }}</v-list-item-text>
-            <v-list-item-hint v-if="collection.description">
-              {{ collection.description }}
-            </v-list-item-hint>
           </v-list-item-content>
         </v-list-item>
       </v-list>
@@ -62,9 +59,6 @@
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-text>{{ collection.label }}</v-list-item-text>
-            <v-list-item-hint v-if="collection.description">
-              {{ collection.description }}
-            </v-list-item-hint>
           </v-list-item-content>
         </v-list-item>
       </v-list>
