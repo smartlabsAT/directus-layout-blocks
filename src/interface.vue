@@ -108,7 +108,7 @@
           :junction-info="junctionInfo"
           :permissions="permissions"
           :loading="blocksLoading"
-          :allowed-collections="allowedCollections"
+          :allowed-collections="filteredCollections"
           @move-block="handleMoveBlock"
           @remove-block="handleRemoveBlock"
           @update-block="handleUpdateBlock"
@@ -130,7 +130,7 @@
             v-if="showBlockCreator"
             :areas="computedAreas"
             :selected-area="selectedArea"
-            :allowed-collections="allowedCollections"
+            :allowed-collections="filteredCollections"
             :junction-info="junctionInfo"
             @create="handleCreateBlock"
             @link="handleLinkBlocks"
@@ -361,13 +361,15 @@ const options = computed<LayoutBlocksOptions>(() => {
 // System
 const api = useApi();
 const stores = useStores();
+const { usePermissionsStore, useUserStore, useFieldsStore, useNotificationsStore, useCollectionsStore } = stores;
+const permissionsStore = usePermissionsStore();
+const userStore = useUserStore();
+const fieldsStore = useFieldsStore();
+const notifications = useNotificationsStore();
+const collectionsStore = useCollectionsStore();
 
 // Resolve drawer-item component
 const DrawerItem = resolveComponent('drawer-item');
-
-const notifications = stores.useNotificationsStore();
-const fieldsStore = stores.useFieldsStore();
-const collectionsStore = stores.useCollectionsStore();
 
 // Try to inject router
 const router = inject('router') as any;
@@ -422,29 +424,24 @@ const editingId = ref<string | number | null>(null);
 const editingCollection = ref<string>('');
 const editingValues = ref<any>({});
 
-// ItemSelector state
-const itemSelector = useItemSelector(api, [selectedCollection.value], {
-  loggerPrefix: '[LayoutBlocks]',
-  allowLink: true,
-  allowDuplicate: true,
-  defaultItemsPerPage: 50
-});
+// ItemSelector will be initialized after allowedCollections is defined
+let itemSelector: any = null;
 
 // ItemSelector computed properties (proxies to composable)
-const itemSelectorItems = computed(() => itemSelector.availableItems.value);
-const itemSelectorLoading = computed(() => itemSelector.loading.value);
-const itemSelectorLoadingDetails = computed(() => itemSelector.loadingDetails.value);
-const itemSelectorCurrentPage = computed(() => itemSelector.currentPage.value);
-const itemSelectorItemsPerPage = computed(() => itemSelector.itemsPerPage.value);
-const itemSelectorTotalItems = computed(() => itemSelector.totalItems.value);
-const itemSelectorAvailableFields = computed(() => itemSelector.availableFields.value);
-const itemSelectorRelations = computed(() => itemSelector.itemRelations.value);
-const itemSelectorError = computed(() => itemSelector.apiError.value);
-const itemSelectorTranslationInfo = computed(() => itemSelector.translationInfo.value);
-const itemSelectorSelectedLanguage = computed(() => itemSelector.selectedLanguage.value);
-const itemSelectorAvailableLanguages = computed(() => itemSelector.availableLanguages.value);
-const itemSelectorSortField = computed(() => itemSelector.sortField.value);
-const itemSelectorSortDirection = computed(() => itemSelector.sortDirection.value);
+const itemSelectorItems = computed(() => itemSelector?.availableItems.value || []);
+const itemSelectorLoading = computed(() => itemSelector?.loading.value || false);
+const itemSelectorLoadingDetails = computed(() => itemSelector?.loadingDetails.value || false);
+const itemSelectorCurrentPage = computed(() => itemSelector?.currentPage.value || 1);
+const itemSelectorItemsPerPage = computed(() => itemSelector?.itemsPerPage.value || 50);
+const itemSelectorTotalItems = computed(() => itemSelector?.totalItems.value || 0);
+const itemSelectorAvailableFields = computed(() => itemSelector?.availableFields.value || []);
+const itemSelectorRelations = computed(() => itemSelector?.itemRelations.value || {});
+const itemSelectorError = computed(() => itemSelector?.apiError.value || null);
+const itemSelectorTranslationInfo = computed(() => itemSelector?.translationInfo.value || null);
+const itemSelectorSelectedLanguage = computed(() => itemSelector?.selectedLanguage.value || '');
+const itemSelectorAvailableLanguages = computed(() => itemSelector?.availableLanguages.value || []);
+const itemSelectorSortField = computed(() => itemSelector?.sortField.value || '');
+const itemSelectorSortDirection = computed(() => itemSelector?.sortDirection.value || 'asc');
 const editSaving = ref(false);
 const editForm = ref<any>(null);
 const fieldOptions = ref<any>(null);
@@ -602,6 +599,14 @@ const formattedAllowedCollections = computed(() => {
   });
   
   return formatted;
+});
+
+// Initialize ItemSelector after allowedCollections is defined
+itemSelector = useItemSelector(api, allowedCollections.value || [], {
+  loggerPrefix: '[LayoutBlocks]',
+  allowLink: true,
+  allowDuplicate: true,
+  defaultItemsPerPage: 50
 });
 
 // Lifecycle
@@ -765,6 +770,22 @@ async function retrySetup() {
   await initialize();
 }
 
+// Watch for changes in allowed collections and update ItemSelector
+watch(allowedCollections, (newCollections) => {
+  if (newCollections && itemSelector) {
+    // Update ItemSelector with new allowed collections
+    itemSelector.updateCollections(newCollections);
+  }
+}, { immediate: false });
+
+// Filter collections based on user permissions
+const filteredCollections = computed(() => {
+  const collections = allowedCollections.value || [];
+  
+  // For now, return all allowed collections
+  // Permission filtering can be added later when we understand the exact Directus permissions API
+  return collections;
+});
 
 // Open block creator
 function openBlockCreator(area?: string) {
@@ -947,42 +968,44 @@ async function handleOpenSelector(data: {
   selectedCollection.value = data.collection;
   
   // Open the ItemSelector with the selected collection
-  itemSelector.open(data.collection);
+  if (itemSelector) {
+    itemSelector.open(data.collection);
+  }
   showItemSelector.value = true;
 }
 
 // ItemSelector event handlers
 function closeItemSelector() {
   showItemSelector.value = false;
-  itemSelector.close();
+  if (itemSelector) itemSelector.close();
 }
 
 function handleItemSelectorSearch(query: string) {
-  itemSelector.handleSearch(query);
+  if (itemSelector) itemSelector.handleSearch(query);
 }
 
 function handleItemSelectorPageChange(page: number) {
-  itemSelector.handlePageChange(page);
+  if (itemSelector) itemSelector.handlePageChange(page);
 }
 
 function handleItemSelectorLanguageChange(language: string) {
-  itemSelector.selectedLanguage.value = language;
+  if (itemSelector) itemSelector.selectedLanguage.value = language;
 }
 
 function handleItemSelectorSortChange(field: string, direction: 'asc' | 'desc') {
-  itemSelector.updateSort(field, direction);
+  if (itemSelector) itemSelector.updateSort(field, direction);
 }
 
 function handleItemSelectorItemsPerPageChange(count: number) {
-  itemSelector.updateItemsPerPage(count);
+  if (itemSelector) itemSelector.updateItemsPerPage(count);
 }
 
 function getTranslatedFieldValue(item: any, field: string): any {
-  return itemSelector.getTranslatedFieldValue(item, field);
+  return itemSelector?.getTranslatedFieldValue(item, field);
 }
 
 function isFieldTranslatable(field: string): boolean {
-  return itemSelector.isFieldTranslatable(field);
+  return itemSelector?.isFieldTranslatable(field) || false;
 }
 
 function getCollectionIcon(collection: string): string {
@@ -1010,6 +1033,9 @@ async function handleItemSelectorLinked(items: any[]) {
       for (const item of items) {
         await linkExistingItem(selectedArea.value, selectedCollection.value, item.id);
       }
+      
+      // Reload blocks to show the newly linked items
+      await loadBlocks();
       
       closeItemSelector();
       
@@ -1042,6 +1068,9 @@ async function handleItemSelectorDuplicated(items: any[]) {
       for (const item of items) {
         await duplicateExistingItem(selectedArea.value, selectedCollection.value, item);
       }
+      
+      // Reload blocks to show the newly duplicated items
+      await loadBlocks();
       
       closeItemSelector();
       
