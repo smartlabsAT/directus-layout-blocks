@@ -1,16 +1,17 @@
 <template>
   <div class="block-creator">
     <div class="creator-header">
-      <h3>Add New Block</h3>
-      <p>Choose a block type to add</p>
+      <h3>{{ headerTitle }}</h3>
+      <p>{{ headerDescription }}</p>
     </div>
 
     <div class="creator-content">
       <!-- Step 1: Select Area -->
-      <div v-if="!selectedArea" class="creator-step">
+      <div v-if="currentStep === 1" class="creator-step">
         <label>Select Area</label>
         <v-select
-          v-model="localArea"
+          :model-value="localArea"
+          @update:model-value="handleAreaSelection"
           :items="availableAreas"
           item-text="label"
           item-value="id"
@@ -32,7 +33,7 @@
       </div>
 
       <!-- Step 2: Select Collection -->
-      <div v-if="localArea" class="creator-step">
+      <div v-if="currentStep === 2" class="creator-step">
         <label>Choose Block Type</label>
         <div class="block-type-grid">
           <div
@@ -40,7 +41,7 @@
             :key="collection.value"
             class="block-type-tile"
             :class="{ 'selected': selectedCollection === collection.value }"
-            @click="selectAndCreate(collection.value)"
+            @click="selectCollection(collection.value)"
           >
             <div class="tile-icon">
               <v-icon :name="getCollectionIcon(collection.value)" large />
@@ -55,13 +56,92 @@
         </div>
       </div>
 
+      <!-- Step 3: Choose Action -->
+      <div v-if="currentStep === 3" class="creator-step">
+        <label>Choose Action</label>
+        <div class="action-list">
+          <div class="action-item" @click="selectAction('create')">
+            <div class="action-icon">
+              <v-icon name="add" />
+            </div>
+            <div class="action-content">
+              <div class="action-title">Create New Item</div>
+              <div class="action-description">Start with a blank item</div>
+            </div>
+            <v-icon name="chevron_right" />
+          </div>
+          
+          <div class="action-item" @click="selectAction('link')">
+            <div class="action-icon">
+              <v-icon name="link" />
+            </div>
+            <div class="action-content">
+              <div class="action-title">Link Existing Item</div>
+              <div class="action-description">Reference an existing content item</div>
+            </div>
+            <v-icon name="chevron_right" />
+          </div>
+          
+          <div class="action-item" @click="selectAction('duplicate')">
+            <div class="action-icon">
+              <v-icon name="content_copy" />
+            </div>
+            <div class="action-content">
+              <div class="action-title">Duplicate Existing Item</div>
+              <div class="action-description">Create a copy of an existing item</div>
+            </div>
+            <v-icon name="chevron_right" />
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="creator-footer">
+      <v-button v-if="currentStep > 1" secondary @click="goBack">
+        Back
+      </v-button>
       <v-button secondary @click="$emit('cancel')">
         Cancel
       </v-button>
     </div>
+
+    <!-- ItemSelector Drawer (Teleported to body) -->
+    <Teleport to="body">
+      <ItemSelectorDrawer
+        v-if="showItemSelector"
+        :open="showItemSelector"
+        :collection="selectedCollection"
+        :collection-name="getCollectionLabel(selectedCollection)"
+        :collection-icon="getCollectionIcon(selectedCollection)"
+        :items="itemSelectorItems"
+        :loading="itemSelectorLoading"
+        :loading-details="itemSelectorLoadingDetails"
+        :current-page="itemSelectorCurrentPage"
+        :items-per-page="itemSelectorItemsPerPage"
+        :total-items="itemSelectorTotalItems"
+        :available-fields="itemSelectorAvailableFields"
+        :item-relations="itemSelectorRelations"
+        :api-error="itemSelectorError"
+        :translation-info="itemSelectorTranslationInfo"
+        :selected-language="itemSelectorSelectedLanguage"
+        :available-languages="itemSelectorAvailableLanguages"
+        :get-translated-field-value="getTranslatedFieldValue"
+        :is-field-translatable="isFieldTranslatable"
+        :allow-link="selectedAction === 'link'"
+        :allow-duplicate="selectedAction === 'duplicate'"
+        :sort-field="itemSelectorSortField"
+        :sort-direction="itemSelectorSortDirection"
+        :logger-prefix="'[LayoutBlocks]'"
+        @close="closeItemSelector"
+        @confirm="handleItemsLinked"
+        @confirm-copy="handleItemsDuplicated"
+        @search="handleItemSelectorSearch"
+        @update:current-page="handleItemSelectorPageChange"
+        @update:selected-language="handleItemSelectorLanguageChange"
+        @update:sort="handleItemSelectorSortChange"
+        @update:items-per-page="handleItemSelectorItemsPerPageChange"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -69,6 +149,7 @@
 import { logger } from '../utils/logger';
 import { ref, computed, watch } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
+import { useItemSelector, ItemSelectorDrawer } from 'directus-extension-expandable-blocks/shared';
 import type { AreaConfig, JunctionInfo } from '../types';
 
 // Props
@@ -88,16 +169,54 @@ const emit = defineEmits<{
     collection: string;
     item: any;
   }];
+  link: [data: {
+    area: string;
+    collection: string;
+    items: any[];
+  }];
+  duplicate: [data: {
+    area: string;
+    collection: string;
+    items: any[];
+  }];
   cancel: [];
-}>();
+}>(); 
 
 // State
 const api = useApi();
 const creating = ref(false);
 const localArea = ref(props.selectedArea || '');
 const selectedCollection = ref('');
+const selectedAction = ref<'create' | 'link' | 'duplicate' | null>(null);
+// Start at step 2 if area is already selected, otherwise step 1
+const currentStep = ref(props.selectedArea ? 2 : 1);
+const showItemSelector = ref(false);
 const itemData = ref<Record<string, any>>({});
 const collectionFields = ref<any[]>([]);
+
+// ItemSelector state
+const itemSelector = useItemSelector(api, [selectedCollection.value], {
+  loggerPrefix: '[LayoutBlocks]',
+  allowLink: true,
+  allowDuplicate: true,
+  defaultItemsPerPage: 50
+});
+
+// ItemSelector computed properties (proxies to composable)
+const itemSelectorItems = computed(() => itemSelector.availableItems.value);
+const itemSelectorLoading = computed(() => itemSelector.loading.value);
+const itemSelectorLoadingDetails = computed(() => itemSelector.loadingDetails.value);
+const itemSelectorCurrentPage = computed(() => itemSelector.currentPage.value);
+const itemSelectorItemsPerPage = computed(() => itemSelector.itemsPerPage.value);
+const itemSelectorTotalItems = computed(() => itemSelector.totalItems.value);
+const itemSelectorAvailableFields = computed(() => itemSelector.availableFields.value);
+const itemSelectorRelations = computed(() => itemSelector.itemRelations.value);
+const itemSelectorError = computed(() => itemSelector.apiError.value);
+const itemSelectorTranslationInfo = computed(() => itemSelector.translationInfo.value);
+const itemSelectorSelectedLanguage = computed(() => itemSelector.selectedLanguage.value);
+const itemSelectorAvailableLanguages = computed(() => itemSelector.availableLanguages.value);
+const itemSelectorSortField = computed(() => itemSelector.sortField.value);
+const itemSelectorSortDirection = computed(() => itemSelector.sortDirection.value);
 
 // Collection metadata
 const collectionInfo: Record<string, any> = {
@@ -152,6 +271,27 @@ const collectionInfo: Record<string, any> = {
 };
 
 // Computed
+const headerTitle = computed(() => {
+  if (currentStep.value === 1) return 'Add New Block';
+  if (currentStep.value === 2) return 'Choose Block Type';
+  if (currentStep.value === 3) return 'Choose Action';
+  return 'Add New Block';
+});
+
+const headerDescription = computed(() => {
+  if (currentStep.value === 1) return 'Select an area for your new block';
+  if (currentStep.value === 2) {
+    // Show which area was selected when we skip step 1
+    if (props.selectedArea) {
+      const area = props.areas.find(a => a.id === props.selectedArea);
+      return `Adding to "${area?.label || props.selectedArea}" - Choose a block type`;
+    }
+    return 'Choose a block type to add';
+  }
+  if (currentStep.value === 3) return 'How would you like to add this block?';
+  return 'Choose a block type to add';
+});
+
 const availableAreas = computed(() => {
   return props.areas.filter(area => {
     if (area.locked) return false;
@@ -233,16 +373,129 @@ function getCollectionLabel(collection: string): string {
     collection.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-async function selectAndCreate(collection: string) {
-  logger.log('🟣 BlockCreator: selectAndCreate called with:', collection);
+function handleAreaSelection(areaId: string) {
+  logger.log('🟣 BlockCreator: Area selected:', areaId);
+  localArea.value = areaId;
+  if (areaId) {
+    currentStep.value = 2;
+  }
+}
+
+function selectCollection(collection: string) {
+  logger.log('🟣 BlockCreator: Collection selected:', collection);
+  selectedCollection.value = collection;
+  currentStep.value = 3;
+}
+
+function selectAction(action: 'create' | 'link' | 'duplicate') {
+  logger.log('🟣 BlockCreator: Action selected:', action);
+  selectedAction.value = action;
   
-  if (!localArea.value) {
-    logger.error('🔴 BlockCreator: No area selected');
+  if (action === 'create') {
+    createNewItem();
+  } else {
+    // Open ItemSelector for link or duplicate
+    showItemSelector.value = true;
+    itemSelector.open(selectedCollection.value);
+  }
+}
+
+function goBack() {
+  if (currentStep.value === 3) {
+    currentStep.value = 2;
+    selectedCollection.value = '';
+    selectedAction.value = null;
+  } else if (currentStep.value === 2) {
+    // If area was pre-selected, don't go back to step 1
+    if (props.selectedArea) {
+      // Just close the dialog
+      emit('cancel');
+    } else {
+      currentStep.value = 1;
+      localArea.value = '';
+    }
+  }
+}
+
+function closeItemSelector() {
+  showItemSelector.value = false;
+  itemSelector.close();
+}
+
+function handleItemsLinked(items: any[]) {
+  logger.log('🟣 BlockCreator: Linking items:', items);
+  
+  if (items.length > 0) {
+    emit('link', {
+      area: localArea.value,
+      collection: selectedCollection.value,
+      items: items
+    });
+    
+    // Close both ItemSelector and BlockCreator
+    closeItemSelector();
+    emit('cancel');
+  } else {
+    closeItemSelector();
+  }
+}
+
+function handleItemsDuplicated(items: any[]) {
+  logger.log('🟣 BlockCreator: Duplicating items:', items);
+  
+  if (items.length > 0) {
+    emit('duplicate', {
+      area: localArea.value,
+      collection: selectedCollection.value,
+      items: items
+    });
+    
+    // Close both ItemSelector and BlockCreator
+    closeItemSelector();
+    emit('cancel');
+  } else {
+    closeItemSelector();
+  }
+}
+
+// ItemSelector event handlers
+function handleItemSelectorSearch(query: string) {
+  itemSelector.handleSearch(query);
+}
+
+function handleItemSelectorPageChange(page: number) {
+  itemSelector.handlePageChange(page);
+}
+
+function handleItemSelectorLanguageChange(language: string) {
+  itemSelector.selectedLanguage.value = language;
+}
+
+function handleItemSelectorSortChange(field: string, direction: 'asc' | 'desc') {
+  itemSelector.updateSort(field, direction);
+}
+
+function handleItemSelectorItemsPerPageChange(count: number) {
+  itemSelector.updateItemsPerPage(count);
+}
+
+function getTranslatedFieldValue(item: any, field: string): any {
+  return itemSelector.getTranslatedFieldValue(item, field);
+}
+
+function isFieldTranslatable(field: string): boolean {
+  return itemSelector.isFieldTranslatable(field);
+}
+
+async function createNewItem() {
+  logger.log('🟣 BlockCreator: Creating new item');
+  
+  if (!localArea.value || !selectedCollection.value) {
+    logger.error('🔴 BlockCreator: Missing area or collection');
     return;
   }
 
   creating.value = true;
-  selectedCollection.value = collection;
 
   try {
     // Create empty item with just status
@@ -251,7 +504,7 @@ async function selectAndCreate(collection: string) {
     };
     
     // Add default values based on collection type
-    const info = collectionInfo[collection];
+    const info = collectionInfo[selectedCollection.value];
     if (info?.quickFields) {
       // Add empty default values for required fields
       if (info.quickFields.includes('title')) {
@@ -267,13 +520,13 @@ async function selectAndCreate(collection: string) {
 
     logger.log('🟣 BlockCreator: Creating block with data:', {
       area: localArea.value,
-      collection: collection,
+      collection: selectedCollection.value,
       item: newItem
     });
 
     emit('create', {
       area: localArea.value,
-      collection: collection,
+      collection: selectedCollection.value,
       item: newItem
     });
 
@@ -287,6 +540,17 @@ async function selectAndCreate(collection: string) {
 watch(() => props.selectedArea, (newArea) => {
   if (newArea) {
     localArea.value = newArea;
+    // Don't change step if already past step 2
+    if (currentStep.value === 1) {
+      currentStep.value = 2;
+    }
+  }
+});
+
+// Watch for area selection to advance step
+watch(localArea, (newArea) => {
+  if (newArea && currentStep.value === 1) {
+    currentStep.value = 2;
   }
 });
 
@@ -454,6 +718,60 @@ watch(selectedCollection, () => {
         font-size: 12px;
         color: var(--foreground-subdued);
       }
+    }
+  }
+}
+
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--background-subdued);
+  border: 2px solid var(--border-subdued);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--background-normal);
+    border-color: var(--border-normal);
+    transform: translateX(4px);
+  }
+
+  .action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--background-normal);
+    border-radius: 50%;
+    color: var(--foreground-subdued);
+  }
+
+  .action-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .action-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--foreground-normal);
+    }
+
+    .action-description {
+      font-size: 12px;
+      color: var(--foreground-subdued);
     }
   }
 }
