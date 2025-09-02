@@ -19,8 +19,6 @@
     "test:watch": "vitest --watch --config config/vitest.config.ts",
     "test:ui": "vitest --ui --config config/vitest.config.ts",
     "test:coverage": "vitest --coverage --config config/vitest.config.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
     "type-check": "tsc --noEmit && echo '✅ TypeScript type-check passed!'",
     "type-check:strict": "tsc --noEmit --project config/tsconfig.strict.json",
     "type-check:quality": "tsc --noEmit --project config/tsconfig.quality.json",
