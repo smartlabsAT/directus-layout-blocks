@@ -1,5 +1,5 @@
 <template>
-  <div class="block-creator">
+  <div class="block-creator" data-testid="block-creator-dialog">
     <div class="creator-header">
       <h3>{{ headerTitle }}</h3>
       <p>{{ headerDescription }}</p>

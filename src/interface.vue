@@ -45,7 +45,7 @@
     </div>
 
     <!-- Main Interface -->
-    <div v-else class="layout-blocks-container">
+    <div v-else class="layout-blocks-container" data-testid="layout-blocks-container">
       <!-- Toolbar -->
       <div class="layout-blocks-toolbar">
         <div class="toolbar-left">
