@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, nextTick } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 
 // First set up all mocks before importing the module that uses them
 const mockApi = {
@@ -56,7 +56,7 @@ describe('useBlocks Composable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    junctionInfo = ref({
+    junctionInfo = computed(() => ({
       collection: 'page_blocks',
       primaryKeyField: 'id',
       foreignKeyField: 'page_id',
@@ -65,17 +65,17 @@ describe('useBlocks Composable', () => {
       hasAreaField: true,
       hasSortField: true,
       allowedCollections: ['content_text', 'content_image']
-    });
+    }));
 
-    options = ref({
+    options = computed(() => ({
       areaField: 'area',
       sortField: 'sort'
-    });
+    }));
   });
 
   describe('linkExistingItem', () => {
     it('should link an existing item successfully', async () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       
       mockApi.post.mockResolvedValueOnce({
         data: { data: { id: 100 } }
@@ -123,7 +123,7 @@ describe('useBlocks Composable', () => {
     });
 
     it('should throw error when trying to link to unsaved item', async () => {
-      const primaryKey = ref('+');
+      const primaryKey = computed(() => '+');
       
       const { linkExistingItem } = useBlocks(
         'pages',
@@ -139,8 +139,8 @@ describe('useBlocks Composable', () => {
     });
 
     it('should throw error when junction info is not available', async () => {
-      const primaryKey = ref(1);
-      const emptyJunctionInfo = ref(null);
+      const primaryKey = computed(() => 1);
+      const emptyJunctionInfo = computed(() => null);
       
       const { linkExistingItem } = useBlocks(
         'pages',
@@ -158,7 +158,7 @@ describe('useBlocks Composable', () => {
 
   describe('duplicateExistingItem', () => {
     it('should duplicate an item successfully', async () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       const itemData = {
         id: 1,
         title: 'Original Item',
@@ -209,7 +209,7 @@ describe('useBlocks Composable', () => {
     });
 
     it('should add suffix to title fields when duplicating', async () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       const testCases = [
         { field: 'title', value: 'Test' },
         { field: 'name', value: 'Test' },
@@ -258,7 +258,7 @@ describe('useBlocks Composable', () => {
 
   describe('loadBlocks', () => {
     it('should handle loadBlocks for existing items', async () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       
       const { loadBlocks, loading } = useBlocks(
         'pages',
@@ -276,7 +276,7 @@ describe('useBlocks Composable', () => {
     });
 
     it('should skip loading for new items', async () => {
-      const primaryKey = ref('+');
+      const primaryKey = computed(() => '+');
       
       const { loadBlocks, blocks } = useBlocks(
         'pages',
@@ -294,7 +294,7 @@ describe('useBlocks Composable', () => {
 
   describe('getBlocksForArea', () => {
     it('should return blocks filtered by area and sorted', () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       
       const { getBlocksForArea } = useBlocks(
         'pages',
@@ -323,7 +323,7 @@ describe('useBlocks Composable', () => {
 
   describe('deleteBlock', () => {
     it('should throw error when block not found', async () => {
-      const primaryKey = ref(1);
+      const primaryKey = computed(() => 1);
       
       const { deleteBlock } = useBlocks(
         'pages',
@@ -338,8 +338,8 @@ describe('useBlocks Composable', () => {
     });
 
     it('should throw error when junction info not available', async () => {
-      const primaryKey = ref(1);
-      const emptyJunctionInfo = ref(null);
+      const primaryKey = computed(() => 1);
+      const emptyJunctionInfo = computed(() => null);
       
       const { deleteBlock } = useBlocks(
         'pages',

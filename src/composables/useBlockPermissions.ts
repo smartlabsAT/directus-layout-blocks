@@ -170,7 +170,7 @@ export function useBlockPermissions(
     /**
      * Validate linking an existing item
      */
-    validateLinkItem: (collection: string, itemId: string | number): ValidationResult => {
+    validateLinkItem: (collection: string, _itemId: string | number): ValidationResult => {
       // Check if collection is allowed
       if (rules.value.allowedCollections.length > 0 && 
           !rules.value.allowedCollections.includes(collection)) {

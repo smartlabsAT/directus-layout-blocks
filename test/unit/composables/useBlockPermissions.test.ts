@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useBlockPermissions } from '../../../src/composables/useBlockPermissions';
 
 // Mock logger
@@ -100,10 +100,10 @@ describe('useBlockPermissions Composable', () => {
 
   describe('Validation Rules', () => {
     it('should validate adding blocks with max limit', () => {
-      const options = ref({
+      const options = computed(() => ({
         maxItemsPerArea: 5,
         allowedCollections: ['content_text', 'content_image']
-      });
+      }));
       
       mockPermissionsStore.permissions = [
         { collection: 'content_text', action: 'create', role: 1 }
@@ -122,9 +122,9 @@ describe('useBlockPermissions Composable', () => {
     });
 
     it('should validate allowed collections', () => {
-      const options = ref({
+      const options = computed(() => ({
         allowedCollections: ['content_text']
-      });
+      }));
       
       mockPermissionsStore.permissions = [
         { collection: 'content_text', action: 'create', role: 1 },
@@ -144,9 +144,9 @@ describe('useBlockPermissions Composable', () => {
     });
 
     it('should validate link permissions', () => {
-      const options = ref({
+      const options = computed(() => ({
         allowedCollections: ['content_text']
-      });
+      }));
       
       mockPermissionsStore.permissions = [
         { collection: 'content_text', action: 'read', role: 1 }
@@ -159,9 +159,9 @@ describe('useBlockPermissions Composable', () => {
     });
 
     it('should validate duplicate permissions', () => {
-      const options = ref({
+      const options = computed(() => ({
         allowedCollections: ['content_text']
-      });
+      }));
       
       mockPermissionsStore.permissions = [
         { collection: 'content_text', action: 'read', role: 1 },
@@ -175,9 +175,9 @@ describe('useBlockPermissions Composable', () => {
     });
 
     it('should deny duplicate without both permissions', () => {
-      const options = ref({
+      const options = computed(() => ({
         allowedCollections: ['content_text']
-      });
+      }));
       
       mockPermissionsStore.permissions = [
         { collection: 'content_text', action: 'read', role: 1 }
@@ -226,12 +226,12 @@ describe('useBlockPermissions Composable', () => {
 
   describe('Computed Rules', () => {
     it('should compute validation rules from options', () => {
-      const options = ref({
+      const options = computed(() => ({
         maxItemsPerArea: 10,
         maxTotalBlocks: 50,
         allowCircularReferences: false,
         allowedCollections: ['content_text', 'content_image']
-      });
+      }));
       
       const { rules } = useBlockPermissions(options);
       
