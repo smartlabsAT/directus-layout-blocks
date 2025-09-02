@@ -250,6 +250,7 @@ import { M2AHelper } from './utils/m2a-helper';
 import { useAutoSetup } from './composables/useAutoSetup';
 import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
+import { useBlockPermissions } from './composables/useBlockPermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type { 
@@ -463,6 +464,7 @@ const editingCollectionFields = computed(() => {
 // Composables
 const { ensureRequiredFields, validateSetup } = useAutoSetup();
 const { checkPermissions } = usePermissions();
+const { permissions: blockPermissions, validation } = useBlockPermissions(options);
 
 // Computed
 const isNewItem = computed(() => 
@@ -782,9 +784,15 @@ watch(allowedCollections, (newCollections) => {
 const filteredCollections = computed(() => {
   const collections = allowedCollections.value || [];
   
-  // For now, return all allowed collections
-  // Permission filtering can be added later when we understand the exact Directus permissions API
-  return collections;
+  // Filter collections based on permissions using our permission checks
+  return collections.filter(collection => {
+    // Check if user has any relevant permission for this collection
+    return (
+      blockPermissions.canCreateItems(collection) ||
+      blockPermissions.canLinkItems(collection) ||
+      blockPermissions.canDuplicateItems(collection)
+    );
+  });
 });
 
 // Open block creator
@@ -828,6 +836,19 @@ async function handleCreateBlock(data: {
   logger.log('🟢 handleCreateBlock called with:', data);
   logger.log('🟢 Current blocks:', blocks.value);
   logger.log('🟢 Junction info:', junctionInfo.value);
+  
+  // Validate permissions and rules
+  const areaBlocks = getBlocksForArea(data.area);
+  const validationResult = validation.validateAddBlock(data.area, data.collection, areaBlocks.length);
+  
+  if (!validationResult.valid) {
+    notifications.add({
+      title: 'Cannot Add Block',
+      text: validationResult.error || 'Permission denied',
+      type: 'error'
+    });
+    return;
+  }
   
   try {
     blocksLoading.value = true;
@@ -1026,6 +1047,18 @@ async function handleItemSelectorLinked(items: any[]) {
   logger.log('🟢 handleItemSelectorLinked called with:', items);
   
   if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    // Validate permissions for linking
+    const validationResult = validation.validateLinkItem(selectedCollection.value, items[0].id);
+    
+    if (!validationResult.valid) {
+      notifications.add({
+        title: 'Cannot Link Items',
+        text: validationResult.error || 'Permission denied',
+        type: 'error'
+      });
+      return;
+    }
+    
     try {
       blocksLoading.value = true;
       
@@ -1061,6 +1094,18 @@ async function handleItemSelectorDuplicated(items: any[]) {
   logger.debug('Duplicating items from selector', { count: items.length });
   
   if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    // Validate permissions for duplicating
+    const validationResult = validation.validateDuplicateItem(selectedCollection.value);
+    
+    if (!validationResult.valid) {
+      notifications.add({
+        title: 'Cannot Duplicate Items',
+        text: validationResult.error || 'Permission denied',
+        type: 'error'
+      });
+      return;
+    }
+    
     try {
       blocksLoading.value = true;
       
@@ -1098,6 +1143,27 @@ async function handleMoveBlock(data: {
   toArea: string;
   toIndex: number;
 }) {
+  // Find the block to get its collection
+  const block = blocks.value.find(b => b.id === data.blockId);
+  if (!block) {
+    logger.error('Block not found for move:', data.blockId);
+    return;
+  }
+  
+  // Validate permissions for moving
+  const validationResult = validation.validateMoveBlock(data.fromArea, data.toArea, block.collection);
+  
+  if (!validationResult.valid) {
+    notifications.add({
+      title: 'Cannot Move Block',
+      text: validationResult.error || 'Permission denied',
+      type: 'error'
+    });
+    // Reload to revert UI state
+    await loadBlocks();
+    return;
+  }
+  
   try {
     await moveBlock(
       data.blockId,
