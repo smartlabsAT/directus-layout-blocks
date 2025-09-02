@@ -537,6 +537,7 @@ const {
   loadBlocks,
   addBlock,
   linkExistingItem,
+  duplicateExistingItem,
   updateBlock,
   deleteBlock,
   reorderBlocks,
@@ -872,22 +873,14 @@ async function handleDuplicateBlocks(data: {
   collection: string;
   items: any[];
 }) {
-  logger.log('🟢 handleDuplicateBlocks called with:', data);
+  logger.debug('Duplicating blocks', { count: data.items.length });
   
   try {
     blocksLoading.value = true;
     
-    // For each selected item, create a new item with copied data
+    // For each selected item, use the new duplicateExistingItem function
     for (const item of data.items) {
-      // Remove system fields from the copy
-      const itemCopy = { ...item };
-      delete itemCopy.id;
-      delete itemCopy.user_created;
-      delete itemCopy.date_created;
-      delete itemCopy.user_updated;
-      delete itemCopy.date_updated;
-      
-      await addBlock(data.area, data.collection, itemCopy);
+      await duplicateExistingItem(data.area, data.collection, item);
     }
     
     showBlockCreator.value = false;
@@ -1039,22 +1032,15 @@ async function handleItemSelectorLinked(items: any[]) {
 }
 
 async function handleItemSelectorDuplicated(items: any[]) {
-  logger.log('🟢 handleItemSelectorDuplicated called with:', items);
+  logger.debug('Duplicating items from selector', { count: items.length });
   
   if (items.length > 0 && selectedArea.value && selectedCollection.value) {
     try {
       blocksLoading.value = true;
       
-      // For each selected item, create a new block with copied data
+      // For each selected item, use the duplicateExistingItem function
       for (const item of items) {
-        const itemCopy = { ...item };
-        delete itemCopy.id;
-        delete itemCopy.user_created;
-        delete itemCopy.date_created;
-        delete itemCopy.user_updated;
-        delete itemCopy.date_updated;
-        
-        await addBlock(selectedArea.value, selectedCollection.value, itemCopy);
+        await duplicateExistingItem(selectedArea.value, selectedCollection.value, item);
       }
       
       closeItemSelector();
@@ -1366,13 +1352,21 @@ async function handleRemoveBlock(blockId: number) {
 async function handleDuplicateBlock(blockId: number) {
   try {
     blocksLoading.value = true;
-    await duplicateBlock(blockId);
+    
+    // Find the block to duplicate
+    const block = blocks.value.find(b => b.id === blockId);
+    if (!block) {
+      throw new Error('Block not found');
+    }
+    
+    // Duplicate the block's item
+    await duplicateExistingItem(block.area, block.collection, block.item);
     
     notifications.add({
       title: 'Block Duplicated',
       type: 'success'
     });
-  } catch (error) {
+  } catch (error: any) {
     notifications.add({
       title: 'Error Duplicating Block',
       text: error.message || 'Failed to duplicate block',

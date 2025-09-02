@@ -221,6 +221,69 @@ export function useBlocks(
   }
 
   /**
+   * Duplicate an existing item and link it to the current record
+   */
+  async function duplicateExistingItem(
+    area: string,
+    targetCollection: string,
+    itemData: any
+  ): Promise<void> {
+    if (!junctionInfo.value) {
+      throw new Error('Junction info not available');
+    }
+
+    const pk = unref(primaryKey);
+    if (!pk || pk === '+' || pk === 'new') {
+      throw new Error('Cannot duplicate items to unsaved record');
+    }
+
+    try {
+      logger.debug('Duplicating existing item', {
+        area,
+        targetCollection,
+        originalItemId: itemData.id
+      });
+
+      // Deep clone the item data
+      const itemCopy = JSON.parse(JSON.stringify(itemData));
+      
+      // Remove system metadata fields (based on expandable-blocks pattern)
+      const metadataFields = ['id', 'user_created', 'user_updated', 'date_created', 'date_updated'];
+      for (const field of metadataFields) {
+        delete itemCopy[field];
+      }
+      
+      // Add suffix to title fields (based on expandable-blocks pattern)
+      const titleFields = ['title', 'name', 'headline', 'label', 'heading'];
+      for (const field of titleFields) {
+        if (itemCopy[field] && typeof itemCopy[field] === 'string') {
+          itemCopy[field] += ' (Copy)';
+          break; // Only add to first found field
+        }
+      }
+
+      logger.debug('Creating duplicated item', { targetCollection });
+
+      // Create the new item in the target collection
+      const itemResponse = await api.post(`/items/${targetCollection}`, itemCopy);
+      const newItemId = itemResponse.data.data.id;
+      logger.debug('Duplicated item created', { id: newItemId });
+
+      // Link the duplicated item
+      await linkExistingItem(area, targetCollection, newItemId);
+
+    } catch (err: any) {
+      logger.error('Failed to duplicate item', err);
+      logger.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      throw err;
+    }
+  }
+
+  /**
    * Update a block's area and/or sort position
    */
   async function updateBlock(
@@ -384,6 +447,7 @@ export function useBlocks(
     getBlocksForArea,
     addBlock,
     linkExistingItem,
+    duplicateExistingItem,
     updateBlock,
     deleteBlock,
     reorderBlocks,
