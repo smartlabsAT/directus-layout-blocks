@@ -326,7 +326,42 @@ export function useBlocks(
   }
 
   /**
-   * Delete a block
+   * Unlink a block (remove junction only, keep content item)
+   */
+  async function unlinkBlock(blockId: number): Promise<void> {
+    if (!junctionInfo.value) {
+      throw new Error('Junction info not available');
+    }
+
+    try {
+      const block = blocks.value.find(b => b.id === blockId);
+      if (!block) {
+        throw new Error('Block not found');
+      }
+
+      // Only delete the junction record (not the content item)
+      await api.delete(`/items/${junctionInfo.value.collection}/${blockId}`);
+
+      // Remove from local state
+      blocks.value = blocks.value.filter(b => b.id !== blockId);
+      
+      // Update sort values for remaining blocks in the same area
+      const remainingBlocks = blocks.value.filter(b => b.area === block.area);
+      remainingBlocks.sort((a, b) => a.sort - b.sort);
+      remainingBlocks.forEach((b, index) => {
+        b.sort = index;
+      });
+
+      logger.debug('Block unlinked successfully');
+
+    } catch (err: any) {
+      logger.error('Failed to unlink block:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Delete a block (with option to delete content item)
    */
   async function deleteBlock(blockId: number, deleteItem = false): Promise<void> {
     if (!junctionInfo.value) {
@@ -449,6 +484,7 @@ export function useBlocks(
     linkExistingItem,
     duplicateExistingItem,
     updateBlock,
+    unlinkBlock,
     deleteBlock,
     reorderBlocks,
     moveBlock

@@ -111,6 +111,8 @@
           :allowed-collections="filteredCollections"
           @move-block="handleMoveBlock"
           @remove-block="handleRemoveBlock"
+          @unlink-block="handleUnlinkBlock"
+          @delete-block="handleDeleteBlock"
           @update-block="handleUpdateBlock"
           @duplicate-block="handleDuplicateBlock"
           @add-block="openBlockCreator"
@@ -538,6 +540,7 @@ const {
   linkExistingItem,
   duplicateExistingItem,
   updateBlock,
+  unlinkBlock,
   deleteBlock,
   reorderBlocks,
   moveBlock
@@ -1428,17 +1431,44 @@ const foreignKeyField = computed(() => {
 
 
 async function handleRemoveBlock(blockId: number) {
+  // This is now just for backward compatibility
+  // The actual unlink/delete is handled by separate methods
+  await handleUnlinkBlock(blockId);
+}
+
+async function handleUnlinkBlock(blockId: number) {
   try {
-    await removeBlock(blockId);
+    await unlinkBlock(blockId);
     
     notifications.add({
-      title: 'Block Removed',
+      title: 'Block Unlinked',
+      text: 'The block has been removed from this page',
       type: 'success'
     });
-  } catch (error) {
+  } catch (error: any) {
     notifications.add({
-      title: 'Error Removing Block',
-      text: error.message || 'Failed to remove block',
+      title: 'Error Unlinking Block',
+      text: error.message || 'Failed to unlink block',
+      type: 'error'
+    });
+  }
+}
+
+async function handleDeleteBlock(blockId: number, deleteContent: boolean) {
+  try {
+    await deleteBlock(blockId, deleteContent);
+    
+    notifications.add({
+      title: deleteContent ? 'Block Deleted' : 'Block Unlinked',
+      text: deleteContent 
+        ? 'The block and its content have been permanently deleted'
+        : 'The block has been removed from this page',
+      type: 'success'
+    });
+  } catch (error: any) {
+    notifications.add({
+      title: 'Error Deleting Block',
+      text: error.message || 'Failed to delete block',
       type: 'error'
     });
   }
