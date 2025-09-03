@@ -1,10 +1,12 @@
 import { logger } from '../utils/logger';
 import { ref, computed, unref, type Ref, type ComputedRef } from 'vue';
-import { useApi } from '@directus/extensions-sdk';
+import { useApi, useStores } from '@directus/extensions-sdk';
+import { M2AHelper } from '../utils/m2a-helper';
 import type { 
   BlockItem, 
   JunctionInfo, 
-  LayoutBlocksOptions 
+  LayoutBlocksOptions,
+  M2AFieldInfo
 } from '../types';
 
 export function useBlocks(
@@ -15,16 +17,20 @@ export function useBlocks(
   options: LayoutBlocksOptions | ComputedRef<LayoutBlocksOptions>
 ) {
   const api = useApi();
+  const stores = useStores();
   const blocks = ref<BlockItem[]>([]);
   const loading = ref(false);
   const error = ref<Error | null>(null);
+  
+  // Initialize M2AHelper
+  const m2aHelper = new M2AHelper(api, stores);
 
   // Get configured field names
   const areaField = computed(() => unref(options).areaField || 'area');
   const sortField = computed(() => unref(options).sortField || 'sort');
 
   /**
-   * Load all blocks for the current item
+   * Load all blocks for the current item using M2AHelper
    */
   async function loadBlocks(): Promise<void> {
     if (!junctionInfo.value) {
@@ -44,494 +50,407 @@ export function useBlocks(
     error.value = null;
 
     try {
-      // Build the filter for the foreign key
-      const filter: any = {
-        [junctionInfo.value.foreignKeyField]: {
-          _eq: unref(primaryKey)
-        }
+      // Create M2AFieldInfo from junction info
+      const m2aFieldInfo: M2AFieldInfo = {
+        field,
+        collection,
+        junctionCollection: junctionInfo.value.collection,
+        junctionField: field,
+        foreignKeyField: junctionInfo.value.foreignKeyField,
+        allowedCollections: junctionInfo.value.allowedCollections || [],
+        areaField: junctionInfo.value.hasAreaField ? areaField.value : undefined,
+        sortField: junctionInfo.value.hasSortField ? sortField.value : undefined
       };
 
-      // Fetch junction records with related items
-      const response = await api.get(`/items/${junctionInfo.value.collection}`, {
-        params: {
-          fields: [
-            '*',
-            `${junctionInfo.value.itemField}.*`
-          ].join(','),
-          filter,
-          sort: `${areaField.value},${sortField.value}`,
-          limit: -1
-        }
-      });
+      logger.debug('Loading blocks with M2AHelper', { parentId: pk });
 
-      // Transform junction records to BlockItems
-      blocks.value = (response.data.data || []).map((record: any) => 
-        transformJunctionToBlock(record)
+      // Load blocks using M2AHelper
+      const loadedData = await m2aHelper.loadM2AData(
+        pk,
+        m2aFieldInfo,
+        0,
+        3
       );
 
-    } catch (err) {
+      // Transform loaded data to BlockItem format
+      blocks.value = loadedData.map((record: any) => ({
+        id: record.id,
+        area: record[areaField.value] || 'main',
+        sort: record[sortField.value] || 0,
+        collection: record.collection,
+        item: record.item,
+        _raw: record
+      }));
+
+      logger.debug(`Loaded ${blocks.value.length} blocks`);
+
+    } catch (err: any) {
+      error.value = err;
       logger.error('Failed to load blocks:', err);
-      error.value = err as Error;
-      blocks.value = [];
+      
+      // Check if it's a permission error
+      if (err.response?.status === 403) {
+        logger.warn('Permission denied when loading blocks. User may not have access to junction collection.');
+      }
     } finally {
       loading.value = false;
     }
   }
 
   /**
-   * Transform a junction record to a BlockItem
+   * Get blocks for a specific area
    */
-  function transformJunctionToBlock(junctionRecord: any): BlockItem {
-    return {
-      id: junctionRecord.id,
-      area: junctionRecord[areaField.value] || unref(options).defaultArea || 'main',
-      sort: junctionRecord[sortField.value] || 0,
-      collection: junctionRecord[junctionInfo.value!.collectionField],
-      item: junctionRecord[junctionInfo.value!.itemField] || {},
-      _raw: junctionRecord
-    };
+  function getBlocksForArea(area: string): BlockItem[] {
+    return blocks.value
+      .filter(block => block.area === area)
+      .sort((a, b) => a.sort - b.sort);
   }
 
   /**
-   * Create a new block
+   * Add a new block (creates new item and links it)
    */
-  async function createBlock(
+  async function addBlock(
     area: string,
     targetCollection: string,
     itemData: any
-  ): Promise<BlockItem> {
-    const pk = unref(primaryKey);
-    logger.log('🟡 createBlock called with:');
-    logger.log('  - area:', area);
-    logger.log('  - targetCollection:', targetCollection);
-    logger.log('  - itemData:', itemData);
-    logger.log('  - primaryKey:', pk);
-    logger.log('  - junctionInfo:', junctionInfo.value);
-    
+  ): Promise<void> {
     if (!junctionInfo.value) {
       throw new Error('Junction info not available');
     }
 
-    // Check if this is a new item
+    const pk = unref(primaryKey);
     if (!pk || pk === '+' || pk === 'new') {
-      throw new Error('Cannot create blocks for unsaved items. Please save the item first.');
+      throw new Error('Cannot add blocks to unsaved item');
     }
 
-    loading.value = true;
+    try {
+      logger.debug('Creating new block', { area, targetCollection });
+
+      // Create the item in the target collection first
+      const itemResponse = await api.post(`/items/${targetCollection}`, itemData);
+      const newItemId = itemResponse.data.data.id;
+      logger.debug('Created new item', { id: newItemId });
+
+      // Link the item
+      await linkExistingItem(area, targetCollection, newItemId);
+
+    } catch (err: any) {
+      logger.error('Failed to add block:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Link an existing item to the current record
+   */
+  async function linkExistingItem(
+    area: string,
+    targetCollection: string,
+    itemId: string | number
+  ): Promise<void> {
+    if (!junctionInfo.value) {
+      throw new Error('Junction info not available');
+    }
+
+    const pk = unref(primaryKey);
+    if (!pk || pk === '+' || pk === 'new') {
+      throw new Error('Cannot link items to unsaved record');
+    }
 
     try {
-      // 1. Create the actual content item
-      logger.log('🟡 Step 1: Creating content item in collection:', targetCollection);
-      const itemResponse = await api.post(`/items/${targetCollection}`, itemData);
-      logger.log('🟡 Content item created:', itemResponse.data);
-      const newItemId = itemResponse.data.data.id;
+      logger.debug('Linking existing item', {
+        area,
+        targetCollection,
+        itemId
+      });
 
-      // 2. Calculate sort position
-      const areaBlocks = blocks.value.filter(b => b.area === area);
-      const maxSort = areaBlocks.length > 0 
-        ? Math.max(...areaBlocks.map(b => b.sort)) 
-        : -1;
-      logger.log('🟡 Step 2: Calculated sort position:', maxSort + 1);
-      logger.log('  - Area blocks:', areaBlocks);
+      // Get the next sort value for the area
+      const areaBlocks = getBlocksForArea(area);
+      const nextSort = areaBlocks.length > 0 
+        ? Math.max(...areaBlocks.map(b => b.sort)) + 1 
+        : 0;
 
-      // 3. Create junction record
+      // Create the junction record
       const junctionData: any = {
         [junctionInfo.value.foreignKeyField]: pk,
-        [junctionInfo.value.collectionField]: targetCollection,
-        [junctionInfo.value.itemField]: newItemId,
-        [areaField.value]: area,
-        [sortField.value]: maxSort + 1
+        [junctionInfo.value.itemField]: itemId,
+        [junctionInfo.value.collectionField]: targetCollection
       };
-      
-      logger.log('🟡 Step 3: Creating junction record:');
-      logger.log('  - Junction collection:', junctionInfo.value.collection);
-      logger.log('  - Junction data:', junctionData);
-      logger.log('  - Field mappings:');
-      logger.log('    - foreignKeyField:', junctionInfo.value.foreignKeyField, '=', pk);
-      logger.log('    - collectionField:', junctionInfo.value.collectionField, '=', targetCollection);
-      logger.log('    - itemField:', junctionInfo.value.itemField, '=', newItemId);
-      logger.log('    - areaField:', areaField.value, '=', area);
-      logger.log('    - sortField:', sortField.value, '=', maxSort + 1);
+
+      // Add area and sort fields if they exist
+      if (junctionInfo.value.hasAreaField) {
+        junctionData[areaField.value] = area;
+      }
+      if (junctionInfo.value.hasSortField) {
+        junctionData[sortField.value] = nextSort;
+      }
+
+      logger.debug('Creating junction record', junctionData);
 
       const junctionResponse = await api.post(
         `/items/${junctionInfo.value.collection}`,
         junctionData
       );
-      logger.log('🟡 Junction record created:', junctionResponse.data);
 
-      // 4. Create and add the new block
+      logger.debug('Junction record created', { id: junctionResponse.data.data.id });
+
+      // Load the full item data for display
+      const itemResponse = await api.get(`/items/${targetCollection}/${itemId}`);
+      
+      // Add to local state
       const newBlock: BlockItem = {
         id: junctionResponse.data.data.id,
         area,
-        sort: maxSort + 1,
+        sort: nextSort,
         collection: targetCollection,
-        item: itemResponse.data.data,
-        _raw: junctionResponse.data.data
+        item: itemResponse.data.data
       };
-      logger.log('🟡 Step 4: Created block object:', newBlock);
 
-      // 5. Update local state
-      blocks.value = [...blocks.value, newBlock];
-      logger.log('🟡 Step 5: Updated blocks array, new length:', blocks.value.length);
-      logger.log('🟡 All blocks:', blocks.value);
+      blocks.value.push(newBlock);
+      logger.debug('Block linked successfully');
 
-      return newBlock;
-
-    } catch (err) {
-      logger.error('🔴 Failed to create block:', err);
-      logger.error('🔴 Error details:', {
-        message: (err as Error).message,
-        response: (err as any).response?.data,
-        status: (err as any).response?.status
+    } catch (err: any) {
+      logger.error('Failed to link item:', err);
+      logger.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
       });
       throw err;
-    } finally {
-      loading.value = false;
     }
   }
 
   /**
-   * Update a block's content
+   * Duplicate an existing item and link it to the current record
    */
-  async function updateBlock(
-    blockId: number,
-    updates: any
+  async function duplicateExistingItem(
+    area: string,
+    targetCollection: string,
+    itemData: any
   ): Promise<void> {
-    const block = blocks.value.find(b => b.id === blockId);
-    if (!block) {
-      throw new Error(`Block ${blockId} not found`);
+    if (!junctionInfo.value) {
+      throw new Error('Junction info not available');
+    }
+
+    const pk = unref(primaryKey);
+    if (!pk || pk === '+' || pk === 'new') {
+      throw new Error('Cannot duplicate items to unsaved record');
     }
 
     try {
-      // Update the actual content item
+      logger.debug('Duplicating existing item', {
+        area,
+        targetCollection,
+        originalItemId: itemData.id
+      });
+
+      // Deep clone the item data
+      const itemCopy = JSON.parse(JSON.stringify(itemData));
+      
+      // Remove system metadata fields (based on expandable-blocks pattern)
+      const metadataFields = ['id', 'user_created', 'user_updated', 'date_created', 'date_updated'];
+      for (const field of metadataFields) {
+        delete itemCopy[field];
+      }
+      
+      // Add suffix to title fields (based on expandable-blocks pattern)
+      const titleFields = ['title', 'name', 'headline', 'label', 'heading'];
+      for (const field of titleFields) {
+        if (itemCopy[field] && typeof itemCopy[field] === 'string') {
+          itemCopy[field] += ' (Copy)';
+          break; // Only add to first found field
+        }
+      }
+
+      logger.debug('Creating duplicated item', { targetCollection });
+
+      // Create the new item in the target collection
+      const itemResponse = await api.post(`/items/${targetCollection}`, itemCopy);
+      const newItemId = itemResponse.data.data.id;
+      logger.debug('Duplicated item created', { id: newItemId });
+
+      // Link the duplicated item
+      await linkExistingItem(area, targetCollection, newItemId);
+
+    } catch (err: any) {
+      logger.error('Failed to duplicate item', err);
+      logger.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Update a block's area and/or sort position
+   */
+  async function updateBlock(
+    blockId: number,
+    updates: { area?: string; sort?: number }
+  ): Promise<void> {
+    if (!junctionInfo.value) {
+      throw new Error('Junction info not available');
+    }
+
+    try {
+      const updateData: any = {};
+      
+      if (updates.area !== undefined && junctionInfo.value.hasAreaField) {
+        updateData[areaField.value] = updates.area;
+      }
+      if (updates.sort !== undefined && junctionInfo.value.hasSortField) {
+        updateData[sortField.value] = updates.sort;
+      }
+
+      // Update the junction record
       await api.patch(
-        `/items/${block.collection}/${block.item.id}`,
-        updates
+        `/items/${junctionInfo.value.collection}/${blockId}`,
+        updateData
       );
 
       // Update local state
-      const blockIndex = blocks.value.findIndex(b => b.id === blockId);
-      if (blockIndex !== -1) {
-        blocks.value[blockIndex] = {
-          ...block,
-          item: {
-            ...block.item,
-            ...updates
-          }
-        };
+      const block = blocks.value.find(b => b.id === blockId);
+      if (block) {
+        if (updates.area !== undefined) block.area = updates.area;
+        if (updates.sort !== undefined) block.sort = updates.sort;
       }
 
-    } catch (err) {
+      logger.debug('Block updated successfully');
+
+    } catch (err: any) {
       logger.error('Failed to update block:', err);
       throw err;
     }
   }
 
   /**
-   * Move a block to a different area or position
+   * Delete a block
    */
-  async function moveBlock(
-    blockId: number,
-    fromArea: string,
-    toArea: string,
-    toIndex: number
-  ): Promise<void> {
+  async function deleteBlock(blockId: number, deleteItem = false): Promise<void> {
     if (!junctionInfo.value) {
       throw new Error('Junction info not available');
     }
 
-    const block = blocks.value.find(b => b.id === blockId);
-    if (!block) {
-      throw new Error(`Block ${blockId} not found`);
-    }
-
-    loading.value = true;
-
     try {
-      const updates: Array<{ id: number; data: any }> = [];
-
-      // If moving to a different area
-      if (fromArea !== toArea) {
-        // Update the moved block
-        updates.push({
-          id: blockId,
-          data: {
-            [areaField.value]: toArea,
-            [sortField.value]: toIndex
-          }
-        });
-
-        // Update sort values in target area
-        const targetAreaBlocks = blocks.value
-          .filter(b => b.area === toArea && b.id !== blockId)
-          .sort((a, b) => a.sort - b.sort);
-
-        targetAreaBlocks.forEach((block, index) => {
-          const newSort = index >= toIndex ? index + 1 : index;
-          if (block.sort !== newSort) {
-            updates.push({
-              id: block.id,
-              data: { [sortField.value]: newSort }
-            });
-          }
-        });
-
-        // Update sort values in source area
-        const sourceAreaBlocks = blocks.value
-          .filter(b => b.area === fromArea && b.id !== blockId)
-          .sort((a, b) => a.sort - b.sort);
-
-        sourceAreaBlocks.forEach((block, index) => {
-          if (block.sort !== index) {
-            updates.push({
-              id: block.id,
-              data: { [sortField.value]: index }
-            });
-          }
-        });
-
-      } else {
-        // Moving within the same area
-        const areaBlocks = blocks.value
-          .filter(b => b.area === toArea)
-          .sort((a, b) => a.sort - b.sort);
-
-        const currentIndex = areaBlocks.findIndex(b => b.id === blockId);
-        
-        // Remove from current position
-        const [movedBlock] = areaBlocks.splice(currentIndex, 1);
-        
-        // Insert at new position
-        areaBlocks.splice(toIndex, 0, movedBlock);
-
-        // Update sort values
-        areaBlocks.forEach((block, index) => {
-          if (block.sort !== index) {
-            updates.push({
-              id: block.id,
-              data: { [sortField.value]: index }
-            });
-          }
-        });
+      const block = blocks.value.find(b => b.id === blockId);
+      if (!block) {
+        throw new Error('Block not found');
       }
 
-      // Execute all updates
-      await Promise.all(
-        updates.map(({ id, data }) =>
-          api.patch(`/items/${junctionInfo.value!.collection}/${id}`, data)
-        )
-      );
+      // Delete the item first if requested
+      if (deleteItem && block.item?.id) {
+        await api.delete(`/items/${block.collection}/${block.item.id}`);
+      }
 
-      // Reload blocks to ensure consistency
-      await loadBlocks();
-
-    } catch (err) {
-      logger.error('Failed to move block:', err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Remove a block
-   */
-  async function removeBlock(blockId: number): Promise<void> {
-    if (!junctionInfo.value) {
-      throw new Error('Junction info not available');
-    }
-
-    const block = blocks.value.find(b => b.id === blockId);
-    if (!block) {
-      throw new Error(`Block ${blockId} not found`);
-    }
-
-    loading.value = true;
-
-    try {
-      // Delete junction record
+      // Delete the junction record
       await api.delete(`/items/${junctionInfo.value.collection}/${blockId}`);
-
-      // Optionally delete the actual item
-      if (unref(options).deleteItems && block.item?.id) {
-        try {
-          await api.delete(`/items/${block.collection}/${block.item.id}`);
-        } catch (err) {
-          logger.warn('Failed to delete related item:', err);
-          // Continue even if item deletion fails
-        }
-      }
 
       // Remove from local state
       blocks.value = blocks.value.filter(b => b.id !== blockId);
+      logger.debug('Block deleted successfully');
 
-      // Re-sort remaining blocks in the area
-      const areaBlocks = blocks.value
-        .filter(b => b.area === block.area)
-        .sort((a, b) => a.sort - b.sort);
+    } catch (err: any) {
+      logger.error('Failed to delete block:', err);
+      throw err;
+    }
+  }
 
-      const updates: Array<{ id: number; sort: number }> = [];
-      
-      areaBlocks.forEach((block, index) => {
-        if (block.sort !== index) {
-          updates.push({ id: block.id, sort: index });
-        }
-      });
+  /**
+   * Reorder blocks within an area
+   */
+  async function reorderBlocks(
+    area: string,
+    blockIds: number[]
+  ): Promise<void> {
+    if (!junctionInfo.value || !junctionInfo.value.hasSortField) {
+      logger.warn('Cannot reorder: sort field not available');
+      return;
+    }
 
-      // Update sort values if needed
-      if (updates.length > 0) {
-        await Promise.all(
-          updates.map(({ id, sort }) =>
-            api.patch(`/items/${junctionInfo.value!.collection}/${id}`, {
-              [sortField.value]: sort
-            })
-          )
+    try {
+      // Update sort values
+      const updates = blockIds.map((id, index) => ({
+        id,
+        [sortField.value]: index
+      }));
+
+      // Batch update
+      for (const update of updates) {
+        await api.patch(
+          `/items/${junctionInfo.value.collection}/${update.id}`,
+          { [sortField.value]: update[sortField.value] }
         );
 
         // Update local state
-        updates.forEach(({ id, sort }) => {
-          const block = blocks.value.find(b => b.id === id);
-          if (block) {
-            block.sort = sort;
-          }
-        });
+        const block = blocks.value.find(b => b.id === update.id);
+        if (block) {
+          block.sort = update[sortField.value];
+        }
       }
 
-    } catch (err) {
-      logger.error('Failed to remove block:', err);
+      logger.debug('Blocks reordered successfully');
+
+    } catch (err: any) {
+      logger.error('Failed to reorder blocks:', err);
       throw err;
-    } finally {
-      loading.value = false;
     }
   }
 
   /**
-   * Duplicate a block
+   * Move block to a different area
    */
-  async function duplicateBlock(blockId: number): Promise<BlockItem> {
+  async function moveBlock(
+    blockId: number,
+    targetArea: string,
+    targetIndex?: number
+  ): Promise<void> {
     const block = blocks.value.find(b => b.id === blockId);
     if (!block) {
-      throw new Error(`Block ${blockId} not found`);
+      throw new Error('Block not found');
     }
 
-    // Create a copy of the item data
-    const itemCopy = { ...block.item };
-    delete itemCopy.id;
-    delete itemCopy.user_created;
-    delete itemCopy.user_updated;
-    delete itemCopy.date_created;
-    delete itemCopy.date_updated;
-
-    // Add suffix to title/name fields
-    if (itemCopy.title) {
-      itemCopy.title += ' (Copy)';
-    } else if (itemCopy.name) {
-      itemCopy.name += ' (Copy)';
-    } else if (itemCopy.headline) {
-      itemCopy.headline += ' (Copy)';
-    }
-
-    // Create new block in same area, right after the original
-    const newBlock = await createBlock(block.area, block.collection, itemCopy);
-
-    // Move it right after the original
-    const areaBlocks = blocks.value
-      .filter(b => b.area === block.area)
-      .sort((a, b) => a.sort - b.sort);
+    // Get blocks in target area
+    const targetBlocks = getBlocksForArea(targetArea);
     
-    const originalIndex = areaBlocks.findIndex(b => b.id === blockId);
-    
-    if (originalIndex !== -1 && originalIndex < areaBlocks.length - 1) {
-      await moveBlock(newBlock.id, block.area, block.area, originalIndex + 1);
+    // Calculate new sort value
+    let newSort: number;
+    if (targetIndex !== undefined && targetIndex >= 0) {
+      if (targetIndex === 0) {
+        newSort = targetBlocks[0]?.sort - 1 || 0;
+      } else if (targetIndex >= targetBlocks.length) {
+        newSort = (targetBlocks[targetBlocks.length - 1]?.sort || 0) + 1;
+      } else {
+        const prevSort = targetBlocks[targetIndex - 1].sort;
+        const nextSort = targetBlocks[targetIndex].sort;
+        newSort = (prevSort + nextSort) / 2;
+      }
+    } else {
+      newSort = targetBlocks.length > 0
+        ? Math.max(...targetBlocks.map(b => b.sort)) + 1
+        : 0;
     }
 
-    return newBlock;
-  }
-
-  /**
-   * Reorder all blocks in an area
-   */
-  async function reorderArea(area: string, blockIds: number[]): Promise<void> {
-    if (!junctionInfo.value) {
-      throw new Error('Junction info not available');
-    }
-
-    loading.value = true;
-
-    try {
-      const updates = blockIds.map((id, index) => ({
-        id,
-        data: { [sortField.value]: index }
-      }));
-
-      await Promise.all(
-        updates.map(({ id, data }) =>
-          api.patch(`/items/${junctionInfo.value!.collection}/${id}`, data)
-        )
-      );
-
-      // Update local state
-      blockIds.forEach((id, index) => {
-        const block = blocks.value.find(b => b.id === id);
-        if (block) {
-          block.sort = index;
-        }
-      });
-
-    } catch (err) {
-      logger.error('Failed to reorder area:', err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Get blocks for a specific area, sorted
-   */
-  function getBlocksByArea(area: string): BlockItem[] {
-    return blocks.value
-      .filter(b => b.area === area)
-      .sort((a, b) => a.sort - b.sort);
-  }
-
-  /**
-   * Check if a block can be moved to an area
-   */
-  function canMoveToArea(blockId: number, targetArea: string): boolean {
-    const block = blocks.value.find(b => b.id === blockId);
-    if (!block) return false;
-
-    // Check area constraints
-    const areaConfig = unref(options).areas?.find(a => a.id === targetArea);
-    if (!areaConfig) return true; // No config means no restrictions
-
-    // Check max items
-    if (areaConfig.maxItems) {
-      const currentCount = blocks.value.filter(b => b.area === targetArea).length;
-      if (currentCount >= areaConfig.maxItems) return false;
-    }
-
-    // Check allowed types
-    if (areaConfig.allowedTypes && areaConfig.allowedTypes.length > 0) {
-      if (!areaConfig.allowedTypes.includes(block.collection)) return false;
-    }
-
-    return true;
+    // Update the block
+    await updateBlock(blockId, {
+      area: targetArea,
+      sort: newSort
+    });
   }
 
   return {
-    blocks,
-    loading,
-    error,
+    blocks: computed(() => blocks.value),
+    loading: computed(() => loading.value),
+    error: computed(() => error.value),
     loadBlocks,
-    createBlock,
+    getBlocksForArea,
+    addBlock,
+    linkExistingItem,
+    duplicateExistingItem,
     updateBlock,
-    moveBlock,
-    removeBlock,
-    duplicateBlock,
-    reorderArea,
-    getBlocksByArea,
-    canMoveToArea
+    deleteBlock,
+    reorderBlocks,
+    moveBlock
   };
 }

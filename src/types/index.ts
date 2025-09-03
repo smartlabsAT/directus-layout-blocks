@@ -89,3 +89,17 @@ export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
 }
+
+export interface M2AFieldInfo {
+  field: string;
+  collection: string;
+  junctionCollection: string;
+  junctionField: string;
+  foreignKeyField: string;
+  allowedCollections: string[];
+  nestedM2AFields?: Record<string, M2AFieldInfo>;
+  hasNestedM2A?: boolean;
+  // Additional fields for layout-blocks
+  areaField?: string;
+  sortField?: string;
+}

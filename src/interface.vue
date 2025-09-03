@@ -45,7 +45,7 @@
     </div>
 
     <!-- Main Interface -->
-    <div v-else class="layout-blocks-container">
+    <div v-else class="layout-blocks-container" data-testid="layout-blocks-container">
       <!-- Toolbar -->
       <div class="layout-blocks-toolbar">
         <div class="toolbar-left">
@@ -108,11 +108,14 @@
           :junction-info="junctionInfo"
           :permissions="permissions"
           :loading="blocksLoading"
+          :allowed-collections="filteredCollections"
           @move-block="handleMoveBlock"
           @remove-block="handleRemoveBlock"
           @update-block="handleUpdateBlock"
           @duplicate-block="handleDuplicateBlock"
           @add-block="openBlockCreator"
+          @create-quick="handleQuickCreate"
+          @open-selector="handleOpenSelector"
         />
       </div>
 
@@ -127,13 +130,53 @@
             v-if="showBlockCreator"
             :areas="computedAreas"
             :selected-area="selectedArea"
-            :allowed-collections="allowedCollections"
+            :allowed-collections="filteredCollections"
             :junction-info="junctionInfo"
             @create="handleCreateBlock"
+            @link="handleLinkBlocks"
+            @duplicate="handleDuplicateBlocks"
             @cancel="showBlockCreator = false"
           />
         </template>
       </v-dialog>
+      
+      <!-- ItemSelector Drawer -->
+      <Teleport to="body">
+        <ItemSelectorDrawer
+          v-if="showItemSelector"
+          :open="showItemSelector"
+          :collection="selectedCollection"
+          :collection-name="getCollectionLabel(selectedCollection)"
+          :collection-icon="getCollectionIcon(selectedCollection)"
+          :items="itemSelectorItems"
+          :loading="itemSelectorLoading"
+          :loading-details="itemSelectorLoadingDetails"
+          :current-page="itemSelectorCurrentPage"
+          :items-per-page="itemSelectorItemsPerPage"
+          :total-items="itemSelectorTotalItems"
+          :available-fields="itemSelectorAvailableFields"
+          :item-relations="itemSelectorRelations"
+          :api-error="itemSelectorError"
+          :translation-info="itemSelectorTranslationInfo"
+          :selected-language="itemSelectorSelectedLanguage"
+          :available-languages="itemSelectorAvailableLanguages"
+          :get-translated-field-value="getTranslatedFieldValue"
+          :is-field-translatable="isFieldTranslatable"
+          :allow-link="true"
+          :allow-duplicate="true"
+          :sort-field="itemSelectorSortField"
+          :sort-direction="itemSelectorSortDirection"
+          :logger-prefix="'[LayoutBlocks]'"
+          @close="closeItemSelector"
+          @confirm="handleItemSelectorLinked"
+          @confirm-copy="handleItemSelectorDuplicated"
+          @search="handleItemSelectorSearch"
+          @update:current-page="handleItemSelectorPageChange"
+          @update:selected-language="handleItemSelectorLanguageChange"
+          @update:sort="handleItemSelectorSortChange"
+          @update:items-per-page="handleItemSelectorItemsPerPageChange"
+        />
+      </Teleport>
       
       <!-- Edit Drawer mit v-form und eigenen Buttons -->
       <v-drawer
@@ -203,10 +246,11 @@
 import { logger } from './utils/logger';
 import { ref, computed, watch, onMounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
 import { useApi, useStores, useCollection } from '@directus/extensions-sdk';
-import { useJunctionDetection } from './composables/useJunctionDetection';
+import { M2AHelper } from './utils/m2a-helper';
 import { useAutoSetup } from './composables/useAutoSetup';
 import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
+import { useBlockPermissions } from './composables/useBlockPermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type { 
@@ -221,6 +265,7 @@ import GridView from './components/GridView.vue';
 import ListView from './components/ListView.vue';
 import AreaManager from './components/AreaManager.vue';
 import BlockCreator from './components/BlockCreator.vue';
+import { useItemSelector, ItemSelectorDrawer } from 'directus-extension-expandable-blocks/shared';
 
 // Props - Using plain defineProps to ensure all props are received
 const props = defineProps({
@@ -317,13 +362,15 @@ const options = computed<LayoutBlocksOptions>(() => {
 // System
 const api = useApi();
 const stores = useStores();
+const { usePermissionsStore, useUserStore, useFieldsStore, useNotificationsStore, useCollectionsStore } = stores;
+const permissionsStore = usePermissionsStore();
+const userStore = useUserStore();
+const fieldsStore = useFieldsStore();
+const notifications = useNotificationsStore();
+const collectionsStore = useCollectionsStore();
 
 // Resolve drawer-item component
 const DrawerItem = resolveComponent('drawer-item');
-
-const notifications = stores.useNotificationsStore();
-const fieldsStore = stores.useFieldsStore();
-const collectionsStore = stores.useCollectionsStore();
 
 // Try to inject router
 const router = inject('router') as any;
@@ -365,15 +412,37 @@ const blocksLoading = ref(false);
 const isSetupComplete = ref(false);
 const setupError = ref<Error | null>(null);
 const junctionInfo = ref<JunctionInfo | null>(null);
+const m2aHelper = new M2AHelper(api, stores);
 const viewMode = ref(options.value.viewMode);
 const selectedArea = ref<string | null>(null);
 const showBlockCreator = ref(false);
 const showAreaManager = ref(false);
 const customAreas = ref<AreaConfig[]>([]);
+const showItemSelector = ref(false);
+const selectedCollection = ref<string>('');
 const drawerActive = ref(false);
 const editingId = ref<string | number | null>(null);
 const editingCollection = ref<string>('');
 const editingValues = ref<any>({});
+
+// ItemSelector will be initialized after allowedCollections is defined
+let itemSelector: any = null;
+
+// ItemSelector computed properties (proxies to composable)
+const itemSelectorItems = computed(() => itemSelector?.availableItems.value || []);
+const itemSelectorLoading = computed(() => itemSelector?.loading.value || false);
+const itemSelectorLoadingDetails = computed(() => itemSelector?.loadingDetails.value || false);
+const itemSelectorCurrentPage = computed(() => itemSelector?.currentPage.value || 1);
+const itemSelectorItemsPerPage = computed(() => itemSelector?.itemsPerPage.value || 50);
+const itemSelectorTotalItems = computed(() => itemSelector?.totalItems.value || 0);
+const itemSelectorAvailableFields = computed(() => itemSelector?.availableFields.value || []);
+const itemSelectorRelations = computed(() => itemSelector?.itemRelations.value || {});
+const itemSelectorError = computed(() => itemSelector?.apiError.value || null);
+const itemSelectorTranslationInfo = computed(() => itemSelector?.translationInfo.value || null);
+const itemSelectorSelectedLanguage = computed(() => itemSelector?.selectedLanguage.value || '');
+const itemSelectorAvailableLanguages = computed(() => itemSelector?.availableLanguages.value || []);
+const itemSelectorSortField = computed(() => itemSelector?.sortField.value || '');
+const itemSelectorSortDirection = computed(() => itemSelector?.sortDirection.value || 'asc');
 const editSaving = ref(false);
 const editForm = ref<any>(null);
 const fieldOptions = ref<any>(null);
@@ -393,9 +462,9 @@ const editingCollectionFields = computed(() => {
 });
 
 // Composables
-const { detectJunctionStructure } = useJunctionDetection();
 const { ensureRequiredFields, validateSetup } = useAutoSetup();
 const { checkPermissions } = usePermissions();
+const { permissions: blockPermissions, validation } = useBlockPermissions(options);
 
 // Computed
 const isNewItem = computed(() => 
@@ -465,11 +534,13 @@ const {
   blocks,
   loading: blocksLoadingState,
   loadBlocks,
-  createBlock,
+  addBlock,
+  linkExistingItem,
+  duplicateExistingItem,
   updateBlock,
-  moveBlock,
-  removeBlock,
-  duplicateBlock
+  deleteBlock,
+  reorderBlocks,
+  moveBlock
 } = useBlocks(
   props.collection!,
   props.field!,
@@ -532,6 +603,14 @@ const formattedAllowedCollections = computed(() => {
   return formatted;
 });
 
+// Initialize ItemSelector after allowedCollections is defined
+itemSelector = useItemSelector(api, allowedCollections.value || [], {
+  loggerPrefix: '[LayoutBlocks]',
+  allowLink: true,
+  allowDuplicate: true,
+  defaultItemsPerPage: 50
+});
+
 // Lifecycle
 onMounted(async () => {
   await initialize();
@@ -584,23 +663,74 @@ async function initialize() {
       throw new Error('Collection and field are required');
     }
 
-    // 1. Detect junction structure
-    logger.log('🚀 Interface: Detecting junction structure...');
-    junctionInfo.value = await detectJunctionStructure(
+    // 1. Detect junction structure using M2AHelper
+    logger.log('🚀 Interface: Detecting junction structure with M2AHelper...');
+    const m2aFieldInfo = await m2aHelper.analyzeM2AStructure(
       props.collection,
       props.field
     );
+    
+    // Get existing fields from junction collection to check what exists
+    let existingFields: string[] = [];
+    let hasAreaField = false;
+    let hasSortField = false;
+    
+    try {
+      const junctionFields = stores.useFieldsStore().getFieldsForCollection(m2aFieldInfo.junctionCollection);
+      existingFields = junctionFields.map((f: any) => f.field);
+      hasAreaField = existingFields.includes('area');
+      hasSortField = existingFields.includes('sort');
+    } catch (e) {
+      logger.debug('Could not get junction fields:', e);
+    }
+    
+    // Convert M2AFieldInfo to JunctionInfo format
+    junctionInfo.value = {
+      collection: m2aFieldInfo.junctionCollection,
+      primaryKeyField: 'id',
+      foreignKeyField: m2aFieldInfo.foreignKeyField,
+      itemField: 'item',
+      collectionField: 'collection',
+      existingFields,
+      hasAreaField,
+      hasSortField,
+      hasCustomFields: false,
+      allowedCollections: m2aFieldInfo.allowedCollections
+    };
     logger.log('🚀 Interface: Junction info detected:', junctionInfo.value);
 
     // 2. Ensure required fields exist
-    if (options.value.autoSetup) {
-      const setupResult = await ensureRequiredFields(
-        junctionInfo.value,
-        options.value
-      );
+    // Skip auto-setup if junction collection already exists with proper fields
+    if (options.value.autoSetup && junctionInfo.value) {
+      // Check if we actually need to create fields
+      const needsSetup = !junctionInfo.value.hasAreaField || !junctionInfo.value.hasSortField;
+      
+      if (needsSetup) {
+        logger.log('🔧 Interface: Setting up missing fields...');
+        try {
+          const setupResult = await ensureRequiredFields(
+            junctionInfo.value,
+            options.value
+          );
 
-      if (!setupResult.success && setupResult.errors.length > 0) {
-        throw setupResult.errors[0];
+          if (!setupResult.success && setupResult.errors.length > 0) {
+            // Only throw if it's not a "field already exists" error
+            const realErrors = setupResult.errors.filter(err => 
+              !err.message?.includes('already exists')
+            );
+            if (realErrors.length > 0) {
+              throw realErrors[0];
+            }
+          }
+        } catch (err: any) {
+          // Ignore 400 errors about fields already existing
+          if (err.response?.status !== 400) {
+            throw err;
+          }
+          logger.log('ℹ️ Fields already exist, continuing...');
+        }
+      } else {
+        logger.log('✅ Junction collection already has all required fields');
       }
     }
 
@@ -642,6 +772,28 @@ async function retrySetup() {
   await initialize();
 }
 
+// Watch for changes in allowed collections and update ItemSelector
+watch(allowedCollections, (newCollections) => {
+  if (newCollections && itemSelector) {
+    // Update ItemSelector with new allowed collections
+    itemSelector.updateCollections(newCollections);
+  }
+}, { immediate: false });
+
+// Filter collections based on user permissions
+const filteredCollections = computed(() => {
+  const collections = allowedCollections.value || [];
+  
+  // Filter collections based on permissions using our permission checks
+  return collections.filter(collection => {
+    // Check if user has any relevant permission for this collection
+    return (
+      blockPermissions.canCreateItems(collection) ||
+      blockPermissions.canLinkItems(collection) ||
+      blockPermissions.canDuplicateItems(collection)
+    );
+  });
+});
 
 // Open block creator
 function openBlockCreator(area?: string) {
@@ -685,11 +837,24 @@ async function handleCreateBlock(data: {
   logger.log('🟢 Current blocks:', blocks.value);
   logger.log('🟢 Junction info:', junctionInfo.value);
   
+  // Validate permissions and rules
+  const areaBlocks = getBlocksForArea(data.area);
+  const validationResult = validation.validateAddBlock(data.area, data.collection, areaBlocks.length);
+  
+  if (!validationResult.valid) {
+    notifications.add({
+      title: 'Cannot Add Block',
+      text: validationResult.error || 'Permission denied',
+      type: 'error'
+    });
+    return;
+  }
+  
   try {
     blocksLoading.value = true;
-    logger.log('🟢 Calling createBlock...');
-    const newBlock = await createBlock(data.area, data.collection, data.item);
-    logger.log('🟢 Block created successfully:', newBlock);
+    logger.log('🟢 Calling addBlock...');
+    await addBlock(data.area, data.collection, data.item);
+    logger.log('🟢 Block added successfully');
     
     showBlockCreator.value = false;
     
@@ -710,12 +875,295 @@ async function handleCreateBlock(data: {
   }
 }
 
+async function handleLinkBlocks(data: {
+  area: string;
+  collection: string;
+  items: any[];
+}) {
+  logger.log('🟢 handleLinkBlocks called with:', data);
+  
+  try {
+    blocksLoading.value = true;
+    
+    // For each selected item, link it using the new linkExistingItem function
+    for (const item of data.items) {
+      logger.log('🔗 Linking item:', item);
+      await linkExistingItem(data.area, data.collection, item.id);
+    }
+    
+    showBlockCreator.value = false;
+    
+    notifications.add({
+      title: 'Items Linked',
+      text: `${data.items.length} item(s) have been linked successfully`,
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('Error linking blocks', error);
+    notifications.add({
+      title: 'Error Linking Items',
+      text: error.message || 'Failed to link items',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleDuplicateBlocks(data: {
+  area: string;
+  collection: string;
+  items: any[];
+}) {
+  logger.debug('Duplicating blocks', { count: data.items.length });
+  
+  try {
+    blocksLoading.value = true;
+    
+    // For each selected item, use the new duplicateExistingItem function
+    for (const item of data.items) {
+      await duplicateExistingItem(data.area, data.collection, item);
+    }
+    
+    showBlockCreator.value = false;
+    
+    notifications.add({
+      title: 'Items Duplicated',
+      text: `${data.items.length} item(s) have been duplicated successfully`,
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('🔴 Error duplicating blocks:', error);
+    notifications.add({
+      title: 'Error Duplicating Items',
+      text: error.message || 'Failed to duplicate items',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleQuickCreate(data: {
+  area: string;
+  collection: string;
+}) {
+  logger.log('🟢 handleQuickCreate called with:', data);
+  
+  try {
+    blocksLoading.value = true;
+    
+    // Create a new empty item with default values
+    const newItem = {
+      status: 'draft',
+      title: `New ${data.collection.replace(/_/g, ' ')}`
+    };
+    
+    await addBlock(data.area, data.collection, newItem);
+    
+    notifications.add({
+      title: 'Block Created',
+      text: 'New block has been created',
+      type: 'success'
+    });
+  } catch (error) {
+    logger.error('🔴 Error creating block:', error);
+    notifications.add({
+      title: 'Error Creating Block',
+      text: error.message || 'Failed to create block',
+      type: 'error'
+    });
+  } finally {
+    blocksLoading.value = false;
+  }
+}
+
+async function handleOpenSelector(data: {
+  area: string;
+  collection: string;
+}) {
+  logger.log('🔵 handleOpenSelector called with:', data);
+  
+  // Store the selected area and collection for later use
+  selectedArea.value = data.area;
+  selectedCollection.value = data.collection;
+  
+  // Open the ItemSelector with the selected collection
+  if (itemSelector) {
+    itemSelector.open(data.collection);
+  }
+  showItemSelector.value = true;
+}
+
+// ItemSelector event handlers
+function closeItemSelector() {
+  showItemSelector.value = false;
+  if (itemSelector) itemSelector.close();
+}
+
+function handleItemSelectorSearch(query: string) {
+  if (itemSelector) itemSelector.handleSearch(query);
+}
+
+function handleItemSelectorPageChange(page: number) {
+  if (itemSelector) itemSelector.handlePageChange(page);
+}
+
+function handleItemSelectorLanguageChange(language: string) {
+  if (itemSelector) itemSelector.selectedLanguage.value = language;
+}
+
+function handleItemSelectorSortChange(field: string, direction: 'asc' | 'desc') {
+  if (itemSelector) itemSelector.updateSort(field, direction);
+}
+
+function handleItemSelectorItemsPerPageChange(count: number) {
+  if (itemSelector) itemSelector.updateItemsPerPage(count);
+}
+
+function getTranslatedFieldValue(item: any, field: string): any {
+  return itemSelector?.getTranslatedFieldValue(item, field);
+}
+
+function isFieldTranslatable(field: string): boolean {
+  return itemSelector?.isFieldTranslatable(field) || false;
+}
+
+function getCollectionIcon(collection: string): string {
+  const collectionInfo: Record<string, any> = {
+    content_headline: { icon: 'title' },
+    content_text: { icon: 'text_fields' },
+    content_image: { icon: 'image' },
+    content_video: { icon: 'videocam' },
+    content_cta: { icon: 'ads_click' },
+    content_button: { icon: 'smart_button' },
+    content_wysiwig: { icon: 'edit_note' },
+    content_block: { icon: 'widgets' }
+  };
+  return collectionInfo[collection]?.icon || 'widgets';
+}
+
+async function handleItemSelectorLinked(items: any[]) {
+  logger.log('🟢 handleItemSelectorLinked called with:', items);
+  
+  if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    // Validate permissions for linking
+    const validationResult = validation.validateLinkItem(selectedCollection.value, items[0].id);
+    
+    if (!validationResult.valid) {
+      notifications.add({
+        title: 'Cannot Link Items',
+        text: validationResult.error || 'Permission denied',
+        type: 'error'
+      });
+      return;
+    }
+    
+    try {
+      blocksLoading.value = true;
+      
+      // For each selected item, create a junction record with just the ID (reference)
+      for (const item of items) {
+        await linkExistingItem(selectedArea.value, selectedCollection.value, item.id);
+      }
+      
+      // Reload blocks to show the newly linked items
+      await loadBlocks();
+      
+      closeItemSelector();
+      
+      notifications.add({
+        title: 'Items Linked',
+        text: `${items.length} item(s) have been linked successfully`,
+        type: 'success'
+      });
+    } catch (error) {
+      logger.error('Error linking blocks', error);
+      notifications.add({
+        title: 'Error Linking Items',
+        text: error.message || 'Failed to link items',
+        type: 'error'
+      });
+    } finally {
+      blocksLoading.value = false;
+    }
+  }
+}
+
+async function handleItemSelectorDuplicated(items: any[]) {
+  logger.debug('Duplicating items from selector', { count: items.length });
+  
+  if (items.length > 0 && selectedArea.value && selectedCollection.value) {
+    // Validate permissions for duplicating
+    const validationResult = validation.validateDuplicateItem(selectedCollection.value);
+    
+    if (!validationResult.valid) {
+      notifications.add({
+        title: 'Cannot Duplicate Items',
+        text: validationResult.error || 'Permission denied',
+        type: 'error'
+      });
+      return;
+    }
+    
+    try {
+      blocksLoading.value = true;
+      
+      // For each selected item, use the duplicateExistingItem function
+      for (const item of items) {
+        await duplicateExistingItem(selectedArea.value, selectedCollection.value, item);
+      }
+      
+      // Reload blocks to show the newly duplicated items
+      await loadBlocks();
+      
+      closeItemSelector();
+      
+      notifications.add({
+        title: 'Items Duplicated',
+        text: `${items.length} item(s) have been duplicated successfully`,
+        type: 'success'
+      });
+    } catch (error) {
+      logger.error('🔴 Error duplicating blocks:', error);
+      notifications.add({
+        title: 'Error Duplicating Items',
+        text: error.message || 'Failed to duplicate items',
+        type: 'error'
+      });
+    } finally {
+      blocksLoading.value = false;
+    }
+  }
+}
+
 async function handleMoveBlock(data: {
   blockId: number;
   fromArea: string;
   toArea: string;
   toIndex: number;
 }) {
+  // Find the block to get its collection
+  const block = blocks.value.find(b => b.id === data.blockId);
+  if (!block) {
+    logger.error('Block not found for move:', data.blockId);
+    return;
+  }
+  
+  // Validate permissions for moving
+  const validationResult = validation.validateMoveBlock(data.fromArea, data.toArea, block.collection);
+  
+  if (!validationResult.valid) {
+    notifications.add({
+      title: 'Cannot Move Block',
+      text: validationResult.error || 'Permission denied',
+      type: 'error'
+    });
+    // Reload to revert UI state
+    await loadBlocks();
+    return;
+  }
+  
   try {
     await moveBlock(
       data.blockId,
@@ -999,13 +1447,21 @@ async function handleRemoveBlock(blockId: number) {
 async function handleDuplicateBlock(blockId: number) {
   try {
     blocksLoading.value = true;
-    await duplicateBlock(blockId);
+    
+    // Find the block to duplicate
+    const block = blocks.value.find(b => b.id === blockId);
+    if (!block) {
+      throw new Error('Block not found');
+    }
+    
+    // Duplicate the block's item
+    await duplicateExistingItem(block.area, block.collection, block.item);
     
     notifications.add({
       title: 'Block Duplicated',
       type: 'success'
     });
-  } catch (error) {
+  } catch (error: any) {
     notifications.add({
       title: 'Error Duplicating Block',
       text: error.message || 'Failed to duplicate block',

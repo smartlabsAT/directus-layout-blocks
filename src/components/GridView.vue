@@ -27,16 +27,15 @@
             <v-chip v-if="getAreaBlocks(area.id).length > 0" small>
               {{ getAreaBlocks(area.id).length }}
             </v-chip>
-            <v-button
+            <AddBlockDropdown
               v-if="!area.locked && permissions.create"
-              v-tooltip="'Add block'"
-              icon
-              x-small
-              secondary
-              @click.stop="handleAddBlock(area.id)"
-            >
-              <v-icon name="add" small />
-            </v-button>
+              :area="area.id"
+              :allowed-collections="allowedCollections"
+              size="x-small"
+              variant="secondary"
+              @create-block="$emit('create-quick', $event)"
+              @open-selector="$emit('open-selector', $event)"
+            />
           </div>
         </div>
 
@@ -70,14 +69,15 @@
           <div v-else class="area-empty">
             <v-icon name="inbox" large color="--foreground-subdued" />
             <p>{{ area.locked ? 'Area is locked' : 'No blocks in this area' }}</p>
-            <v-button
+            <AddBlockDropdown
               v-if="!area.locked && permissions.create"
-              small
-              secondary
-              @click.stop="handleAddBlock(area.id)"
-            >
-              Add First Block
-            </v-button>
+              :area="area.id"
+              :allowed-collections="allowedCollections"
+              size="small"
+              variant="secondary"
+              @create-block="$emit('create-quick', $event)"
+              @open-selector="$emit('open-selector', $event)"
+            />
           </div>
         </div>
 
@@ -101,6 +101,7 @@
 <script setup lang="ts">
 import { logger } from '../utils/logger';
 import { ref, computed } from 'vue';
+import AddBlockDropdown from './AddBlockDropdown.vue';
 import type { 
   BlockItem, 
   AreaConfig, 
@@ -117,6 +118,7 @@ interface Props {
   options: LayoutBlocksOptions;
   permissions: UserPermissions;
   loading?: boolean;
+  allowedCollections?: string[] | null;
 }
 
 const props = defineProps<Props>();
@@ -133,6 +135,8 @@ const emit = defineEmits<{
   'remove-block': [blockId: number];
   'duplicate-block': [blockId: number];
   'add-block': [area?: string];
+  'create-quick': [data: { area: string; collection: string }];
+  'open-selector': [data: { area: string; collection: string }];
 }>();
 
 // Local State
