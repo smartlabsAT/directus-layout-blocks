@@ -16,45 +16,45 @@
       <v-card-text>
         <div class="delete-dialog-content">
           <!-- Radio options for delete type -->
-          <v-radio-group
-            v-model="deleteMode"
-            :disabled="loading"
-          >
-            <v-radio
-              value="unlink"
-              label="Remove from this page only"
-            >
-              <template #label>
-                <div class="option-label">
-                  <v-icon name="link_off" small />
-                  <div>
-                    <div class="option-title">Remove from this page only</div>
-                    <div class="option-description">
-                      The content will remain available and can be used elsewhere
-                    </div>
+          <div class="action-options">
+            <label class="action-option" :class="{ selected: deleteMode === 'unlink' }">
+              <input
+                type="radio"
+                :value="false"
+                v-model="deleteContent"
+                :disabled="loading"
+                name="delete-mode"
+              />
+              <div class="option-content">
+                <v-icon name="link_off" small />
+                <div>
+                  <div class="option-title">Remove from this page only</div>
+                  <div class="option-description">
+                    The content will remain available and can be used elsewhere
                   </div>
                 </div>
-              </template>
-            </v-radio>
+              </div>
+            </label>
 
-            <v-radio
-              value="delete"
-              label="Delete permanently"
-              :disabled="!canDelete"
-            >
-              <template #label>
-                <div class="option-label danger">
-                  <v-icon name="delete" small />
-                  <div>
-                    <div class="option-title">Delete permanently</div>
-                    <div class="option-description">
-                      The content will be removed completely and cannot be recovered
-                    </div>
+            <label class="action-option" :class="{ selected: deleteMode === 'delete', danger: true }">
+              <input
+                type="radio"
+                :value="true"
+                v-model="deleteContent"
+                :disabled="loading || !canDelete"
+                name="delete-mode"
+              />
+              <div class="option-content">
+                <v-icon name="delete" small />
+                <div>
+                  <div class="option-title">Delete permanently</div>
+                  <div class="option-description">
+                    The content will be removed completely and cannot be recovered
                   </div>
                 </div>
-              </template>
-            </v-radio>
-          </v-radio-group>
+              </div>
+            </label>
+          </div>
 
           <!-- Warning for permanent deletion -->
           <v-notice
@@ -85,7 +85,7 @@
         </v-button>
         <v-button
           :loading="loading"
-          :kind="deleteMode === 'delete' ? 'danger' : 'primary'"
+          :kind="deleteContent ? 'danger' : 'primary'"
           @click="handleConfirm"
         >
           {{ confirmButtonText }}
@@ -119,29 +119,31 @@ const emit = defineEmits<{
 }>();
 
 // Local state
-const deleteMode = ref<'unlink' | 'delete'>('unlink');
+const deleteContent = ref(false);
 
 // Computed properties
+const deleteMode = computed(() => deleteContent.value ? 'delete' : 'unlink');
+
 const dialogTitle = computed(() => {
   return `Remove ${props.blockTitle}?`;
 });
 
 const confirmButtonText = computed(() => {
   if (props.loading) return 'Processing...';
-  return deleteMode.value === 'delete' ? 'Delete Permanently' : 'Remove';
+  return deleteContent.value ? 'Delete Permanently' : 'Remove';
 });
 
 // Methods
 function handleConfirm() {
-  logger.debug('Delete dialog confirmed', { mode: deleteMode.value });
+  logger.debug('Delete dialog confirmed', { deleteContent: deleteContent.value });
   emit('confirm', {
-    deleteContent: deleteMode.value === 'delete'
+    deleteContent: deleteContent.value
   });
 }
 
 function handleCancel() {
   logger.debug('Delete dialog cancelled');
-  deleteMode.value = 'unlink'; // Reset to default
+  deleteContent.value = false; // Reset to default
   emit('cancel');
   emit('update:modelValue', false);
 }
@@ -149,41 +151,79 @@ function handleCancel() {
 
 <style lang="scss" scoped>
 .delete-dialog-content {
-  :deep(.v-radio-group) {
-    .v-radio {
-      margin-bottom: 16px;
-      
-      &:last-child {
-        margin-bottom: 0;
-      }
-    }
+  padding: 8px 0;
+}
+
+.action-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.action-option {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  border: 2px solid var(--border-normal);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--background-page);
+
+  &:hover {
+    border-color: var(--primary-25);
+    background: var(--background-normal);
+  }
+
+  &.selected {
+    border-color: var(--primary);
+    background: var(--primary-10);
+  }
+
+  &.danger.selected {
+    border-color: var(--danger);
+    background: var(--danger-10);
+  }
+
+  input[type="radio"] {
+    margin-right: 12px;
+    margin-top: 2px;
+    cursor: pointer;
+  }
+
+  &:has(input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
-.option-label {
+.option-content {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
-  padding: 8px 0;
+  flex: 1;
 
   .v-icon {
     margin-top: 2px;
-    color: var(--theme--foreground-subdued);
-  }
-
-  &.danger .v-icon {
-    color: var(--theme--danger);
+    color: var(--foreground-subdued);
   }
 
   .option-title {
     font-weight: 500;
     margin-bottom: 4px;
+    color: var(--foreground-normal);
   }
 
   .option-description {
     font-size: 13px;
-    color: var(--theme--foreground-subdued);
+    color: var(--foreground-subdued);
     line-height: 1.4;
+  }
+}
+
+.danger {
+  .v-icon {
+    color: var(--danger);
   }
 }
 
