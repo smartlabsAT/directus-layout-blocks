@@ -58,6 +58,8 @@
               :draggable="options.enableDragDrop && (!area.locked || area.id === 'orphaned')"
               @edit="$emit('update-block', { blockId: block.id })"
               @remove="$emit('remove-block', block.id)"
+              @unlink="$emit('unlink-block', block.id)"
+              @delete="$emit('delete-block', block.id, $event)"
               @duplicate="$emit('duplicate-block', block.id)"
               @update-status="handleBlockStatusUpdate(block, $event)"
               @dragstart="handleDragStart($event, block, area)"
@@ -133,6 +135,9 @@ const emit = defineEmits<{
     toIndex: number;
   }];
   'remove-block': [blockId: number];
+  'unlink-block': [blockId: number];
+  'delete-block': [blockId: number, deleteContent: boolean];
+  'update-block': [data: { blockId: number }];
   'duplicate-block': [blockId: number];
   'add-block': [area?: string];
   'create-quick': [data: { area: string; collection: string }];

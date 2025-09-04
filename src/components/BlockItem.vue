@@ -85,18 +85,45 @@
           <v-list-item
             v-if="permissions.delete"
             clickable
+            @click="showDeleteDialog = true"
+          >
+            <v-list-item-icon>
+              <v-icon name="link_off" />
+            </v-list-item-icon>
+            <v-list-item-content>
+              <div>Unassign</div>
+              <div class="list-item-subtitle">Remove from this page only</div>
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item
+            v-if="permissions.delete && canDeleteContent"
+            clickable
             class="danger"
-            @click="confirmRemove"
+            @click="showDeleteDialog = true"
           >
             <v-list-item-icon>
               <v-icon name="delete" />
             </v-list-item-icon>
-            <v-list-item-content>Remove</v-list-item-content>
+            <v-list-item-content>
+              <div>Delete Everywhere</div>
+              <div class="list-item-subtitle">Delete item and all references</div>
+            </v-list-item-content>
           </v-list-item>
         </v-list>
       </v-menu>
     </div>
   </div>
+
+  <!-- Delete Confirmation Dialog -->
+  <delete-confirmation-dialog
+    v-model="showDeleteDialog"
+    :block-title="getBlockTitle(block)"
+    :can-delete="canDeleteContent"
+    :loading="deleteLoading"
+    @confirm="handleDeleteConfirm"
+    @cancel="showDeleteDialog = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -104,6 +131,7 @@ import { computed, ref } from 'vue';
 import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
 import StatusSelector from './StatusSelector.vue';
+import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
 
 // Props
 interface Props {
@@ -126,6 +154,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   edit: [];
   remove: [];
+  unlink: [];
+  delete: [deleteContent: boolean];
   duplicate: [];
   click: [];
   'update-status': [status: string];
@@ -133,12 +163,19 @@ const emit = defineEmits<{
 
 // State
 const isSelected = ref(props.selected);
+const showDeleteDialog = ref(false);
+const deleteLoading = ref(false);
 
 // Computed
 const hasActions = computed(() => {
   return props.permissions.update || 
          props.permissions.delete || 
          props.permissions.create;
+});
+
+const canDeleteContent = computed(() => {
+  // Check if user has permission to delete content items
+  return props.permissions.delete && props.block.item !== null;
 });
 
 // Methods
@@ -157,10 +194,20 @@ function handleDoubleClick() {
   emit('edit');
 }
 
-function confirmRemove() {
-  if (confirm('Are you sure you want to remove this block?')) {
-    emit('remove');
+function handleDeleteConfirm(options: { deleteContent: boolean }) {
+  deleteLoading.value = true;
+  
+  if (options.deleteContent) {
+    emit('delete', true);
+  } else {
+    emit('unlink');
   }
+  
+  // Reset state
+  setTimeout(() => {
+    showDeleteDialog.value = false;
+    deleteLoading.value = false;
+  }, 100);
 }
 
 function updateStatus(status: string) {
@@ -274,5 +321,11 @@ function updateStatus(status: string) {
     display: flex;
     align-items: center;
   }
+}
+
+.list-item-subtitle {
+  font-size: 12px;
+  color: var(--foreground-subdued);
+  margin-top: 2px;
 }
 </style>
