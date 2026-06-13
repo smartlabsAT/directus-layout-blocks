@@ -446,32 +446,26 @@ export function useBlocks(
       throw new Error('Block not found');
     }
 
-    // Get blocks in target area
-    const targetBlocks = getBlocksForArea(targetArea);
-    
-    // Calculate new sort value
-    let newSort: number;
-    if (targetIndex !== undefined && targetIndex >= 0) {
-      if (targetIndex === 0) {
-        newSort = targetBlocks[0]?.sort - 1 || 0;
-      } else if (targetIndex >= targetBlocks.length) {
-        newSort = (targetBlocks[targetBlocks.length - 1]?.sort || 0) + 1;
-      } else {
-        const prevSort = targetBlocks[targetIndex - 1].sort;
-        const nextSort = targetBlocks[targetIndex].sort;
-        newSort = (prevSort + nextSort) / 2;
-      }
-    } else {
-      newSort = targetBlocks.length > 0
-        ? Math.max(...targetBlocks.map(b => b.sort)) + 1
-        : 0;
-    }
+    // Build the target area's order without the moved block, then insert it at
+    // the drop index. We renumber the whole area with sequential integer sort
+    // values (via reorderBlocks) instead of computing fractional midpoints,
+    // which the integer `sort` column rejects (e.g. a midpoint like -4.5 caused
+    // a 500 on the junction update).
+    const orderedIds = getBlocksForArea(targetArea)
+      .filter(b => b.id !== blockId)
+      .map(b => b.id);
 
-    // Update the block
-    await updateBlock(blockId, {
-      area: targetArea,
-      sort: newSort
-    });
+    const insertAt = targetIndex !== undefined && targetIndex >= 0
+      ? Math.min(targetIndex, orderedIds.length)
+      : orderedIds.length;
+    orderedIds.splice(insertAt, 0, blockId);
+
+    // Apply the area change first, then renumber the target area with clean
+    // integer sort values.
+    if (block.area !== targetArea) {
+      await updateBlock(blockId, { area: targetArea });
+    }
+    await reorderBlocks(targetArea, orderedIds);
   }
 
   return {
