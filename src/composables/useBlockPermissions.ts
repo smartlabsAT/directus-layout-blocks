@@ -224,18 +224,12 @@ export function useBlockPermissions(
     /**
      * Validate moving a block between areas
      */
-    validateMoveBlock: (fromArea: string, toArea: string, collection: string): ValidationResult => {
-      // Check permissions
-      if (!permissions.canUpdateItems(collection)) {
-        return {
-          valid: false,
-          error: 'You do not have permission to move blocks'
-        };
-      }
-
-      // Check if target area allows this collection type
-      // This would require area-specific configuration
-      
+    validateMoveBlock: (_fromArea: string, _toArea: string, _collection: string): ValidationResult => {
+      // Moving a block only updates the junction row's area/sort. Authorization
+      // is enforced server-side by the API on that update, so no client-side
+      // permission gate is needed here. The previous canUpdateItems() check was
+      // unreliable under the Directus 11 policy-based permission model and
+      // wrongly blocked legitimate users (including admins).
       return { valid: true };
     },
 

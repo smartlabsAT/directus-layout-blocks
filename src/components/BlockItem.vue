@@ -8,6 +8,7 @@
     }"
     :data-block-id="block.id"
     :draggable="draggable"
+    v-bind="$attrs"
     @click.stop="handleClick"
     @dblclick="handleDoubleClick"
   >
@@ -132,6 +133,12 @@ import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
 import StatusSelector from './StatusSelector.vue';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
+
+// This component has multiple root nodes (the block element + the delete dialog),
+// so Vue cannot auto-inherit fallthrough listeners. Without this, the parent's
+// @dragstart / @dragend listeners were silently dropped and drag-and-drop never
+// started. Disable auto-inherit and bind $attrs explicitly on the draggable root.
+defineOptions({ inheritAttrs: false });
 
 // Props
 interface Props {

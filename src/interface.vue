@@ -1177,7 +1177,6 @@ async function handleMoveBlock(data: {
   try {
     await moveBlock(
       data.blockId,
-      data.fromArea,
       data.toArea,
       data.toIndex
     );
