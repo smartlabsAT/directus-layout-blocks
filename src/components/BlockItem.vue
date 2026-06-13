@@ -8,7 +8,7 @@
     }"
     :data-block-id="block.id"
     :draggable="draggable"
-    @click="handleClick"
+    @click.stop="handleClick"
     @dblclick="handleDoubleClick"
   >
     <!-- Block Icon/Type Indicator -->
