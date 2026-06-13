@@ -1028,9 +1028,13 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 body.dragging-block {
   .area-tab {
     transition: all 0.2s ease;
-    
+
+    // Use an outline (does not affect layout) instead of changing the border
+    // style. A border change revealed a hidden border width and grew the tab,
+    // reflowing the content and making the blocks jump while dragging.
     &:not(.active) {
-      border-style: dashed;
+      outline: 2px dashed var(--primary);
+      outline-offset: -2px;
     }
   }
   
