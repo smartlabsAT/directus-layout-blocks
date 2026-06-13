@@ -572,6 +572,7 @@ function handleAddBlock(areaId: string) {
 }
 
 .area-header {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -691,14 +692,20 @@ function handleAddBlock(areaId: string) {
 </style>
 
 <style lang="scss">
-// Global styles for drag state
+// Global styles for drag state.
+// The drop hint is drawn as an absolutely-positioned overlay rather than a
+// border, so it never changes the header box height. A border would reflow the
+// content below it, and since drag-over toggles continuously while the pointer
+// moves, that made the blocks jump by the border width.
 body.dragging-block {
-  .grid-area {
-    &:not(.drag-over) {
-      .area-header {
-        border-bottom-style: dashed;
-      }
-    }
+  .grid-area:not(.drag-over) .area-header::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-bottom: 2px dashed var(--primary);
+    pointer-events: none;
   }
 }
 </style>
