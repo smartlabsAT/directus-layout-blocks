@@ -254,6 +254,7 @@ import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { useBlockPermissions } from './composables/useBlockPermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
+import { normalizeAreaIds } from './utils/helpers';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type { 
   LayoutBlocksOptions, 
@@ -492,7 +493,13 @@ const computedAreas = computed<AreaConfig[]>(() => {
   else {
     areas = [...DEFAULT_AREA_CONFIG];
   }
-  
+
+  // Harden against areas configured without an `id`. Without this, such areas
+  // render with `id: undefined` and their blocks (keyed by area) silently
+  // disappear. Default a missing id from the label, the configured defaultArea,
+  // or the index. Areas that already have an id are left unchanged.
+  areas = normalizeAreaIds(areas, options.value.defaultArea || 'main');
+
   // Only add orphaned area if there are orphaned blocks
   const hasOrphanedBlocks = blocks.value.some(b => b.area === 'orphaned');
   const hasOrphanedArea = areas.some(a => a.id === 'orphaned');
