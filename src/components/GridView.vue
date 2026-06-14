@@ -305,7 +305,7 @@ function createDragImage(block: BlockItem): HTMLElement {
   // SCOPED styles (its data-v attribute), so a hand-built node would render no
   // glyph — the clone carries that scope attribute and renders correctly.
   const sourceIcon = document.querySelector(
-    `.block-item[data-block-id="${block.id}"] .block-icon .v-icon`
+    `.block-item[data-block-id=${CSS.escape(String(block.id))}] .block-icon .v-icon`
   );
   if (sourceIcon) {
     header.appendChild(sourceIcon.cloneNode(true));
