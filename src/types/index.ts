@@ -51,8 +51,15 @@ export interface JunctionInfo {
   allowedCollections?: string[];
 }
 
+/**
+ * Junction record identifier. Persisted blocks carry the numeric junction PK;
+ * unsaved blocks carry a temporary string id (`new_`/`dup_`/`existing_` prefix)
+ * until the global Save resolves them to a real PK.
+ */
+export type BlockId = number | string;
+
 export interface BlockItem {
-  id: number;
+  id: BlockId;
   area: string;
   sort: number;
   collection: string;

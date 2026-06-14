@@ -254,13 +254,15 @@ import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { useBlockPermissions } from './composables/useBlockPermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
-import { normalizeAreaIds } from './utils/helpers';
+import { normalizeAreaIds, isTempId } from './utils/helpers';
+import { cloneDeep } from 'lodash-es';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
-import type { 
-  LayoutBlocksOptions, 
-  JunctionInfo, 
+import type {
+  LayoutBlocksOptions,
+  JunctionInfo,
   BlockItem,
-  AreaConfig 
+  BlockId,
+  AreaConfig
 } from './types';
 
 // Import components (we'll create these next)
@@ -425,6 +427,7 @@ const showItemSelector = ref(false);
 const selectedCollection = ref<string>('');
 const drawerActive = ref(false);
 const editingId = ref<string | number | null>(null);
+const editingBlockId = ref<BlockId | null>(null);
 const editingCollection = ref<string>('');
 const editingValues = ref<any>({});
 
@@ -550,7 +553,10 @@ const {
   unlinkBlock,
   deleteBlock,
   reorderBlocks,
-  moveBlock
+  moveBlock,
+  markBlockDirty,
+  isInternalUpdate,
+  prepareItemsForEmit
 } = useBlocks(
   props.collection!,
   props.field!,
@@ -1148,13 +1154,14 @@ async function handleItemSelectorDuplicated(items: any[]) {
 }
 
 async function handleMoveBlock(data: {
-  blockId: number;
+  blockId: BlockId;
   fromArea: string;
   toArea: string;
   toIndex: number;
 }) {
-  // Find the block to get its collection
-  const block = blocks.value.find(b => b.id === data.blockId);
+  // Compare as strings: drag payloads from the DOM are strings, while persisted
+  // blocks carry numeric ids (see fix #40/#42).
+  const block = blocks.value.find(b => String(b.id) === String(data.blockId));
   if (!block) {
     logger.error('Block not found for move:', data.blockId);
     return;
@@ -1176,7 +1183,7 @@ async function handleMoveBlock(data: {
   
   try {
     await moveBlock(
-      data.blockId,
+      block.id,
       data.toArea,
       data.toIndex
     );
@@ -1204,35 +1211,29 @@ async function handleUpdateBlock(data: {
   }
   
   try {
-    // Find the block to get its collection and item ID
+    // Find the block to get its collection and item id
     const block = blocks.value.find(b => b.id === data.blockId);
     if (!block) {
       throw new Error('Block not found');
     }
-    
-    if (!block.item?.id) {
-      throw new Error('Block item ID not found');
-    }
-    
-    logger.log('🔵 Opening Directus drawer for:', {
-      collection: block.collection,
-      itemId: block.item.id
-    });
-    
-    // Set the editing info
+
     editingCollection.value = block.collection;
-    editingId.value = block.item.id;
-    
-    // Load the current values for the form
-    logger.log('🔵 Loading block data for edit');
-    const response = await api.get(`/items/${block.collection}/${block.item.id}`);
-    editingValues.value = response.data.data;
-    
-    logger.log('🔵 Opening drawer with data:', editingValues.value);
-    
+    editingBlockId.value = block.id;
+
+    if (isTempId(block.id) || !block.item?.id) {
+      // Unsaved block: edit its inline content in create mode (no API item yet).
+      editingId.value = '+';
+      editingValues.value = cloneDeep(block.item || {});
+    } else {
+      // Persisted block: load current item values read-only for the form.
+      editingId.value = block.item.id;
+      const response = await api.get(`/items/${block.collection}/${block.item.id}`);
+      editingValues.value = response.data.data;
+    }
+
     // Open drawer
     drawerActive.value = true;
-    
+
   } catch (error) {
     logger.error('🔴 Error opening editor:', error);
     notifications.add({
@@ -1243,49 +1244,26 @@ async function handleUpdateBlock(data: {
   }
 }
 
-async function handleBlockStatusUpdate(blockId: number, newStatus: string) {
+async function handleBlockStatusUpdate(blockId: BlockId, newStatus: string) {
   logger.log('🔵 Updating block status:', blockId, 'to', newStatus);
-  
-  try {
-    // Find the block
-    const block = blocks.value.find(b => b.id === blockId);
-    if (!block) {
-      throw new Error('Block not found');
-    }
-    
-    if (!block.item?.id) {
-      throw new Error('Block item ID not found');
-    }
-    
-    // Send PATCH request to update status
-    await api.patch(`/items/${block.collection}/${block.item.id}`, {
-      status: newStatus
-    });
-    
-    logger.log('✅ Status updated successfully');
-    
-    notifications.add({
-      title: 'Status Updated',
-      text: `Block status changed to ${newStatus}`,
-      type: 'success'
-    });
-    
-    // Update local block data
-    if (block.item) {
-      block.item.status = newStatus;
-    }
-    
-    // Reload blocks to ensure consistency
-    await loadBlocks();
-    
-  } catch (error: any) {
-    logger.error('🔴 Error updating status:', error);
-    notifications.add({
-      title: 'Error Updating Status',
-      text: error.message || 'Failed to update block status',
-      type: 'error'
-    });
+
+  const block = blocks.value.find(b => b.id === blockId);
+  if (!block) {
+    logger.error('🔴 Block not found for status update:', blockId);
+    return;
   }
+
+  // Stage the status change locally; persisted on global Save.
+  if (block.item) {
+    block.item.status = newStatus;
+  }
+  markBlockDirty(blockId, true);
+
+  notifications.add({
+    title: 'Status Updated',
+    text: `Block status changed to ${newStatus}`,
+    type: 'success'
+  });
 }
 
 // Helper to check if a field exists in the current collection
@@ -1371,46 +1349,37 @@ function getFieldOptions(field: any): any[] {
   return [];
 }
 
-// Save block directly via API
+// Stage drawer edits into block state (persisted on global Save).
 async function saveBlockDirectly() {
-  if (!editingId.value || !editingCollection.value || !editingValues.value) return;
-  
+  if (!editingCollection.value || editingBlockId.value === null) return;
+
   editSaving.value = true;
-  
+
   try {
-    logger.log('💾 Saving block directly to API:', {
-      collection: editingCollection.value,
-      id: editingId.value,
-      values: editingValues.value
-    });
-    
-    // Send PATCH request to update the item
-    await api.patch(`/items/${editingCollection.value}/${editingId.value}`, editingValues.value);
-    
-    logger.log('✅ Block saved successfully');
-    
+    const block = blocks.value.find(b => b.id === editingBlockId.value);
+    if (block) {
+      block.item = { ...block.item, ...editingValues.value };
+      markBlockDirty(block.id, true);
+    }
+
     notifications.add({
       title: 'Block Updated',
-      text: 'Changes have been saved successfully',
+      text: 'Changes staged — use Save to persist',
       type: 'success'
     });
-    
-    // Close drawer
+
+    // Close drawer + reset editing state
     drawerActive.value = false;
-    
-    // Reset editing state
     editingId.value = null;
+    editingBlockId.value = null;
     editingCollection.value = '';
     editingValues.value = {};
-    
-    // Reload blocks to show changes
-    await loadBlocks();
-    
+
   } catch (error: any) {
-    logger.error('🔴 Error saving block:', error);
+    logger.error('🔴 Error staging block changes:', error);
     notifications.add({
       title: 'Error Saving Block',
-      text: error.message || 'Failed to save block',
+      text: error.message || 'Failed to stage block changes',
       type: 'error'
     });
   } finally {
@@ -1422,6 +1391,7 @@ async function saveBlockDirectly() {
 function handleDrawerCancel() {
   drawerActive.value = false;
   editingId.value = null;
+  editingBlockId.value = null;
   editingCollection.value = '';
   editingValues.value = {};
 }
@@ -1436,13 +1406,13 @@ const foreignKeyField = computed(() => {
 });
 
 
-async function handleRemoveBlock(blockId: number) {
+async function handleRemoveBlock(blockId: BlockId) {
   // This is now just for backward compatibility
   // The actual unlink/delete is handled by separate methods
   await handleUnlinkBlock(blockId);
 }
 
-async function handleUnlinkBlock(blockId: number) {
+async function handleUnlinkBlock(blockId: BlockId) {
   try {
     await unlinkBlock(blockId);
     
@@ -1460,7 +1430,7 @@ async function handleUnlinkBlock(blockId: number) {
   }
 }
 
-async function handleDeleteBlock(blockId: number, deleteContent: boolean) {
+async function handleDeleteBlock(blockId: BlockId, deleteContent: boolean) {
   try {
     await deleteBlock(blockId, deleteContent);
     
@@ -1480,7 +1450,7 @@ async function handleDeleteBlock(blockId: number, deleteContent: boolean) {
   }
 }
 
-async function handleDuplicateBlock(blockId: number) {
+async function handleDuplicateBlock(blockId: BlockId) {
   try {
     blocksLoading.value = true;
     
@@ -1562,66 +1532,13 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
       logger.log('Interface: Will move blocks to "orphaned" area');
       
       for (const block of blocksToOrphan) {
-        logger.log(`Interface: Processing block ${block.id} for orphaning`);
-        try {
-          // Update the junction record to remove its area assignment
-          // We need to update the junction table, not the content item
-          if (!junctionInfo.value) {
-            logger.error('Interface: No junction info available for orphaning!');
-            continue;
-          }
-          
-          const areaField = options.value.areaField || 'area';
-          // Instead of setting to null, move to 'orphaned' area
-          const updateData = { [areaField]: 'orphaned' };
-          
-          logger.log(`Interface: Preparing to orphan block ${block.id}`, {
-            collection: junctionInfo.value.collection,
-            blockId: block.id,
-            blockData: block,
-            areaField: areaField,
-            updateData: updateData
-          });
-            
-            try {
-              const response = await api.patch(
-                `/items/${junctionInfo.value.collection}/${block.id}`,
-                updateData
-              );
-              
-              logger.log(`Interface: Block ${block.id} orphaned successfully`, response);
-              
-              // Update local state immediately
-              const blockIndex = blocks.value.findIndex(b => b.id === block.id);
-              if (blockIndex !== -1) {
-                blocks.value[blockIndex].area = 'orphaned';
-              }
-            } catch (patchError: any) {
-              logger.error(`Interface: PATCH request failed:`, {
-                url: `/items/${junctionInfo.value.collection}/${block.id}`,
-                updateData: updateData,
-                error: patchError,
-                status: patchError.response?.status,
-                statusText: patchError.response?.statusText,
-                responseData: patchError.response?.data,
-                message: patchError.message
-              });
-              throw patchError;
-            }
-        } catch (error: any) {
-          logger.error(`Interface: Error orphaning block ${block.id}:`);
-          logger.error('Full error object:', error);
-          logger.error('Error message:', error?.message);
-          
-          // Most importantly, check the API response
-          if (error?.response?.data) {
-            logger.error('API Error Response:', error.response.data);
-            if (error.response.data.errors) {
-              error.response.data.errors.forEach((err: any) => {
-                logger.error('API Error Detail:', err);
-              });
-            }
-          }
+        // Stage the orphaning locally; persisted on global Save (no immediate
+        // write — keeps the form in a single consistent, discardable state).
+        const blockIndex = blocks.value.findIndex(b => b.id === block.id);
+        if (blockIndex !== -1) {
+          blocks.value[blockIndex].area = 'orphaned';
+          markBlockDirty(block.id, true);
+          logger.log(`Interface: Block ${block.id} staged for orphaning`);
         }
       }
       
@@ -1693,16 +1610,26 @@ function saveAreas() {
   // and then close itself, which will set showAreaManager to false
 }
 
-// Watch for external value changes
-watch(() => props.value, (newValue) => {
-  if (JSON.stringify(newValue) !== JSON.stringify(blocks.value)) {
-    loadBlocks();
-  }
+// Emit block changes into the Directus form state so the global Save / Discard
+// buttons control persistence. `prepareItemsForEmit` shapes the M2A value
+// (bare ids for clean blocks, full objects for dirty/new). Guarded against our
+// own programmatic updates (loadBlocks / post-emit) to avoid feedback loops.
+watch(blocks, () => {
+  if (isInternalUpdate.value) return;
+  isInternalUpdate.value = true;
+  emit('input', prepareItemsForEmit());
+  nextTick(() => {
+    isInternalUpdate.value = false;
+  });
 }, { deep: true });
 
-// Emit changes
-watch(blocks, (newBlocks) => {
-  emit('input', newBlocks);
+// React to external value changes. After Save the value returns the persisted
+// ids; after Discard it reverts to the last saved value. In both cases the
+// database holds the truth (nothing is written mid-session), so we reload
+// read-only and reset the dirty baseline. Skipped for our own emits.
+watch(() => props.value, () => {
+  if (isInternalUpdate.value) return;
+  loadBlocks();
 }, { deep: true });
 </script>
 

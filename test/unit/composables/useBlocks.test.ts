@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, computed, nextTick } from 'vue';
+import { computed, nextTick } from 'vue';
 
 // First set up all mocks before importing the module that uses them
 const mockApi = {
@@ -48,14 +48,22 @@ vi.mock('../../../src/utils/m2a-helper', () => ({
 
 // Now import the module after mocks are set up
 import { useBlocks } from '../../../src/composables/useBlocks';
+import { M2AHelper } from '../../../src/utils/m2a-helper';
+import { isTempId, isExistingLink } from '../../../src/utils/helpers';
 
-describe('useBlocks Composable', () => {
+describe('useBlocks Composable (global-save / state-based)', () => {
   let junctionInfo: any;
   let options: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+    // The vitest config enables mockReset/restoreMocks, which wipes mock
+    // implementations before each test — re-establish the M2AHelper constructor
+    // so `new M2AHelper()` keeps returning our stub.
+    (M2AHelper as unknown as { mockImplementation: (fn: () => any) => void })
+      .mockImplementation(() => mockM2AHelper);
+    mockM2AHelper.loadM2AData.mockResolvedValue([]);
+
     junctionInfo = computed(() => ({
       collection: 'page_blocks',
       primaryKeyField: 'id',
@@ -73,283 +81,213 @@ describe('useBlocks Composable', () => {
     }));
   });
 
-  describe('linkExistingItem', () => {
-    it('should link an existing item successfully', async () => {
-      const primaryKey = computed(() => 1);
-      
-      mockApi.post.mockResolvedValueOnce({
-        data: { data: { id: 100 } }
-      });
-      
-      mockApi.get.mockResolvedValueOnce({
-        data: { data: { id: 1, title: 'Test Item' } }
-      });
+  function setup(primaryKeyValue: string | number = 1) {
+    return useBlocks('pages', 'blocks', computed(() => primaryKeyValue), junctionInfo, options);
+  }
 
-      const { linkExistingItem, blocks } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
+  /**
+   * Seed the composable's internal `blocks` via loadBlocks() + the mocked
+   * M2AHelper, then await the flush so state is populated.
+   */
+  async function seed(blocks: any[]) {
+    mockM2AHelper.loadM2AData.mockResolvedValue(blocks);
+    const api = setup(1);
+    await api.loadBlocks();
+    await nextTick();
+    return api;
+  }
 
-      await linkExistingItem('main', 'content_text', 1);
+  const baseRecord = (over: Partial<any> = {}) => ({
+    id: 10,
+    area: 'main',
+    sort: 0,
+    collection: 'content_text',
+    item: { id: 5, title: 'A' },
+    ...over
+  });
 
-      // Check that junction record was created
-      expect(mockApi.post).toHaveBeenCalledWith(
-        '/items/page_blocks',
-        expect.objectContaining({
-          page_id: 1,
-          item: 1,
-          collection: 'content_text',
-          area: 'main',
-          sort: 0
-        })
-      );
+  describe('addBlock (staged, no API write)', () => {
+    it('stages a new block with a temporary id and inline content', async () => {
+      const { addBlock, blocks } = setup(1);
 
-      // Check that item was fetched
-      expect(mockApi.get).toHaveBeenCalledWith('/items/content_text/1');
+      await addBlock('main', 'content_text', { title: 'New' });
 
-      // Check that block was added to local state
-      await nextTick();
-      expect(blocks.value).toContainEqual(
-        expect.objectContaining({
-          id: 100,
-          area: 'main',
-          sort: 0,
-          collection: 'content_text'
-        })
-      );
-    });
-
-    it('should throw error when trying to link to unsaved item', async () => {
-      const primaryKey = computed(() => '+');
-      
-      const { linkExistingItem } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-
-      await expect(
-        linkExistingItem('main', 'content_text', 1)
-      ).rejects.toThrow('Cannot link items to unsaved record');
-    });
-
-    it('should throw error when junction info is not available', async () => {
-      const primaryKey = computed(() => 1);
-      const emptyJunctionInfo = computed(() => null);
-      
-      const { linkExistingItem } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        emptyJunctionInfo,
-        options
-      );
-
-      await expect(
-        linkExistingItem('main', 'content_text', 1)
-      ).rejects.toThrow('Junction info not available');
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(blocks.value).toHaveLength(1);
+      const block = blocks.value[0];
+      expect(isTempId(block.id)).toBe(true);
+      expect(block.area).toBe('main');
+      expect(block.collection).toBe('content_text');
+      expect(block.item).toEqual({ title: 'New' });
     });
   });
 
-  describe('duplicateExistingItem', () => {
-    it('should duplicate an item successfully', async () => {
-      const primaryKey = computed(() => 1);
+  describe('linkExistingItem (staged, read-only fetch)', () => {
+    it('fetches the item read-only and stages an existing-link block', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: { data: { id: 7, title: 'Linked' } } });
+      const { linkExistingItem, blocks } = setup(1);
+
+      await linkExistingItem('main', 'content_text', 7);
+
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(mockApi.get).toHaveBeenCalledWith('/items/content_text/7');
+      expect(blocks.value).toHaveLength(1);
+      expect(isExistingLink(blocks.value[0].id)).toBe(true);
+      expect(blocks.value[0].item).toEqual({ id: 7, title: 'Linked' });
+    });
+  });
+
+  describe('duplicateExistingItem (staged, no API write)', () => {
+    it('strips metadata and adds a (Copy) suffix without writing', async () => {
+      const { duplicateExistingItem, blocks } = setup(1);
       const itemData = {
         id: 1,
-        title: 'Original Item',
-        content: 'Test content',
-        user_created: 'user1',
+        title: 'Original',
+        content: 'body',
+        user_created: 'u1',
         date_created: '2024-01-01'
       };
 
-      // Mock create new item
-      mockApi.post.mockResolvedValueOnce({
-        data: { data: { id: 2 } }
-      });
-      
-      // Mock create junction
-      mockApi.post.mockResolvedValueOnce({
-        data: { data: { id: 101 } }
-      });
-      
-      // Mock get item
-      mockApi.get.mockResolvedValueOnce({
-        data: { data: { id: 2, title: 'Original Item (Copy)' } }
-      });
-
-      const { duplicateExistingItem, blocks } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-
       await duplicateExistingItem('main', 'content_text', itemData);
 
-      // Check that item was created without metadata fields
-      expect(mockApi.post).toHaveBeenCalledWith(
-        '/items/content_text',
-        expect.objectContaining({
-          title: 'Original Item (Copy)',
-          content: 'Test content'
-        })
-      );
-
-      // Verify metadata fields were removed
-      const callData = mockApi.post.mock.calls[0][1];
-      expect(callData).not.toHaveProperty('id');
-      expect(callData).not.toHaveProperty('user_created');
-      expect(callData).not.toHaveProperty('date_created');
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(blocks.value).toHaveLength(1);
+      const item = blocks.value[0].item;
+      expect(item.title).toBe('Original (Copy)');
+      expect(item.content).toBe('body');
+      expect(item).not.toHaveProperty('id');
+      expect(item).not.toHaveProperty('user_created');
+      expect(item).not.toHaveProperty('date_created');
     });
 
-    it('should add suffix to title fields when duplicating', async () => {
-      const primaryKey = computed(() => 1);
-      const testCases = [
-        { field: 'title', value: 'Test' },
-        { field: 'name', value: 'Test' },
-        { field: 'headline', value: 'Test' },
-        { field: 'label', value: 'Test' },
-        { field: 'heading', value: 'Test' }
-      ];
-
-      for (const testCase of testCases) {
-        vi.clearAllMocks();
-        
-        const itemData = {
-          id: 1,
-          [testCase.field]: testCase.value
-        };
-
-        mockApi.post.mockResolvedValueOnce({
-          data: { data: { id: 2 } }
-        });
-        mockApi.post.mockResolvedValueOnce({
-          data: { data: { id: 101 } }
-        });
-        mockApi.get.mockResolvedValueOnce({
-          data: { data: { id: 2 } }
-        });
-
-        const { duplicateExistingItem } = useBlocks(
-          'pages',
-          'blocks',
-          primaryKey,
-          junctionInfo,
-          options
-        );
-
-        await duplicateExistingItem('main', 'content_text', itemData);
-
-        expect(mockApi.post).toHaveBeenCalledWith(
-          '/items/content_text',
-          expect.objectContaining({
-            [testCase.field]: `${testCase.value} (Copy)`
-          })
-        );
+    it.each(['title', 'name', 'headline', 'label', 'heading'])(
+      'adds the (Copy) suffix to the %s field',
+      async (field) => {
+        const { duplicateExistingItem, blocks } = setup(1);
+        await duplicateExistingItem('main', 'content_text', { id: 1, [field]: 'Test' });
+        expect(blocks.value[0].item[field]).toBe('Test (Copy)');
       }
+    );
+  });
+
+  describe('updateBlock / reorderBlocks / moveBlock (state only)', () => {
+    it('updateBlock mutates area/sort and marks dirty', async () => {
+      const { updateBlock, blocks } = await seed([baseRecord()]);
+      await updateBlock(10, { area: 'sidebar', sort: 3 });
+      expect(mockApi.patch).not.toHaveBeenCalled();
+      expect(blocks.value[0].area).toBe('sidebar');
+      expect(blocks.value[0].sort).toBe(3);
+    });
+
+    it('reorderBlocks assigns sequential integer sorts (fix #42)', async () => {
+      const { reorderBlocks, blocks } = await seed([
+        baseRecord({ id: 10, sort: 0 }),
+        baseRecord({ id: 11, sort: 1, item: { id: 6, title: 'B' } })
+      ]);
+      await reorderBlocks('main', [11, 10]);
+      expect(mockApi.patch).not.toHaveBeenCalled();
+      expect(blocks.value.find(b => b.id === 11)!.sort).toBe(0);
+      expect(blocks.value.find(b => b.id === 10)!.sort).toBe(1);
+    });
+
+    it('moveBlock changes the area and keeps integer sorts', async () => {
+      const { moveBlock, blocks } = await seed([baseRecord({ id: 10, area: 'main', sort: 0 })]);
+      await moveBlock(10, 'sidebar', 0);
+      expect(mockApi.patch).not.toHaveBeenCalled();
+      const moved = blocks.value.find(b => b.id === 10)!;
+      expect(moved.area).toBe('sidebar');
+      expect(Number.isInteger(moved.sort)).toBe(true);
+    });
+  });
+
+  describe('unlinkBlock / deleteBlock', () => {
+    it('unlinkBlock removes the block from state without an API call', async () => {
+      const { unlinkBlock, blocks } = await seed([baseRecord()]);
+      await unlinkBlock(10);
+      expect(mockApi.delete).not.toHaveBeenCalled();
+      expect(blocks.value).toHaveLength(0);
+    });
+
+    it('deleteBlock(deleteItem=true) deletes the content item immediately, junction deferred', async () => {
+      mockApi.delete.mockResolvedValueOnce({});
+      const { deleteBlock, blocks } = await seed([baseRecord()]);
+      await deleteBlock(10, true);
+      expect(mockApi.delete).toHaveBeenCalledWith('/items/content_text/5');
+      expect(blocks.value).toHaveLength(0);
+    });
+
+    it('deleteBlock throws when the block is not found', async () => {
+      const { deleteBlock } = setup(1);
+      await expect(deleteBlock(999, true)).rejects.toThrow('Block not found');
     });
   });
 
   describe('loadBlocks', () => {
-    it('should handle loadBlocks for existing items', async () => {
-      const primaryKey = computed(() => 1);
-      
-      const { loadBlocks, loading } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-      
-      // Loading should start as false
-      expect(loading.value).toBe(false);
-      
-      // loadBlocks should execute without errors
-      await expect(loadBlocks()).resolves.not.toThrow();
-    });
-
-    it('should skip loading for new items', async () => {
-      const primaryKey = computed(() => '+');
-      
-      const { loadBlocks, blocks } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-
+    it('skips loading for new (unsaved) items', async () => {
+      const { loadBlocks, blocks } = setup('+');
       await loadBlocks();
-      
       expect(blocks.value).toEqual([]);
     });
   });
 
-  describe('getBlocksForArea', () => {
-    it('should return blocks filtered by area and sorted', () => {
-      const primaryKey = computed(() => 1);
-      
-      const { getBlocksForArea } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-
-      // This test actually tests internal implementation
-      // In real usage, blocks would be loaded via loadBlocks
-      // For now, we'll test the function logic with mock data
-      const testBlocks = [
-        { id: 1, area: 'main', sort: 2, collection: 'content_text', item: {} },
-        { id: 2, area: 'sidebar', sort: 1, collection: 'content_image', item: {} },
-        { id: 3, area: 'main', sort: 1, collection: 'content_text', item: {} },
-        { id: 4, area: 'main', sort: 3, collection: 'content_image', item: {} }
-      ];
-
-      // Since getBlocksForArea filters internal blocks array,
-      // and we can't directly set it in the test, we'll skip this test
-      // or refactor the composable to allow testing
-      expect(true).toBe(true); // Placeholder assertion
-    });
-  });
-
-  describe('deleteBlock', () => {
-    it('should throw error when block not found', async () => {
-      const primaryKey = computed(() => 1);
-      
-      const { deleteBlock } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        junctionInfo,
-        options
-      );
-
-      // Try to delete non-existent block
-      await expect(deleteBlock(999, true)).rejects.toThrow('Block not found');
+  describe('prepareItemsForEmit (Directus M2A value shape)', () => {
+    it('emits a bare id for a clean, persisted block', async () => {
+      const { prepareItemsForEmit } = await seed([baseRecord()]);
+      expect(prepareItemsForEmit()).toEqual([10]);
     });
 
-    it('should throw error when junction info not available', async () => {
-      const primaryKey = computed(() => 1);
-      const emptyJunctionInfo = computed(() => null);
-      
-      const { deleteBlock } = useBlocks(
-        'pages',
-        'blocks',
-        primaryKey,
-        emptyJunctionInfo,
-        options
-      );
+    it('emits a full junction object (with nested item + area + sort) for a dirty block', async () => {
+      const { prepareItemsForEmit, markBlockDirty } = await seed([baseRecord()]);
+      markBlockDirty(10, true);
+      const out = prepareItemsForEmit();
+      expect(out[0]).toEqual({
+        id: 10,
+        collection: 'content_text',
+        area: 'main',
+        sort: 0,
+        item: { id: 5, title: 'A' }
+      });
+    });
 
-      await expect(deleteBlock(1, false)).rejects.toThrow('Junction info not available');
+    it('emits a nested item WITHOUT id for a brand-new block', async () => {
+      const { prepareItemsForEmit, addBlock } = await seed([]);
+      await addBlock('main', 'content_text', { title: 'New' });
+      const out = prepareItemsForEmit();
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({
+        collection: 'content_text',
+        area: 'main',
+        item: { title: 'New' }
+      });
+      expect(out[0]).not.toHaveProperty('id');
+      expect(out[0].item).not.toHaveProperty('id');
+    });
+
+    it('emits the bare item PK for a linked existing item (source not mutated)', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: { data: { id: 7, title: 'Linked' } } });
+      const { prepareItemsForEmit, linkExistingItem } = await seed([]);
+      await linkExistingItem('main', 'content_text', 7);
+      const out = prepareItemsForEmit();
+      expect(out[0]).toMatchObject({ collection: 'content_text', area: 'main', item: 7 });
+      expect(out[0]).not.toHaveProperty('id');
+    });
+
+    it('omits a deleted/unlinked block from the emitted value', async () => {
+      const { prepareItemsForEmit, unlinkBlock } = await seed([baseRecord()]);
+      await unlinkBlock(10);
+      expect(prepareItemsForEmit()).toEqual([]);
+    });
+
+    it('emits integer sort values after a reorder (fix #42 guard)', async () => {
+      const { prepareItemsForEmit, reorderBlocks } = await seed([
+        baseRecord({ id: 10, sort: 0 }),
+        baseRecord({ id: 11, sort: 1, item: { id: 6, title: 'B' } })
+      ]);
+      await reorderBlocks('main', [11, 10]);
+      const out = prepareItemsForEmit() as any[];
+      for (const entry of out) {
+        expect(Number.isInteger(entry.sort)).toBe(true);
+      }
     });
   });
 });
