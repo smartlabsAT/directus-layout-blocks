@@ -11,7 +11,7 @@
         :class="{ clickable: editable }"
         @click="editable && toggle()"
       >
-        <span class="status-dot" :class="`status-${status || 'draft'}`" />
+        <span class="lb-status-dot" :class="`status-${status || 'draft'}`" />
         <span class="status-text">{{ getStatusLabel(status) }}</span>
       </div>
     </template>
@@ -25,7 +25,7 @@
         @click="$emit('update:status', option.value)"
       >
         <v-list-item-icon>
-          <span class="status-dot" :class="`status-${option.value}`" />
+          <span class="lb-status-dot" :class="`status-${option.value}`" />
         </v-list-item-icon>
         <v-list-item-content>{{ option.text }}</v-list-item-content>
       </v-list-item>
@@ -33,7 +33,7 @@
   </v-menu>
   
   <div v-else class="status-display">
-    <span class="status-dot" :class="`status-${status || 'draft'}`" />
+    <span class="lb-status-dot" :class="`status-${status || 'draft'}`" />
     <span class="status-text">{{ getStatusLabel(status) }}</span>
   </div>
 </template>
@@ -65,35 +65,15 @@ defineEmits<{
   border-radius: var(--theme--border-radius);
   font-size: 13px;
   transition: background-color 0.2s;
-  
+
   &.clickable {
     cursor: pointer;
-    
+
     &:hover {
-      background-color: var(--theme--background-accent);
+      background-color: var(--theme--background-normal);
     }
   }
-  
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--theme--foreground-subdued);
-    flex-shrink: 0;
 
-    &.status-published {
-      background: var(--theme--success);
-    }
-
-    &.status-draft {
-      background: var(--theme--warning);
-    }
-    
-    &.status-archived {
-      background: var(--theme--foreground-subdued);
-    }
-  }
-  
   .status-text {
     color: var(--theme--foreground);
   }
@@ -101,32 +81,38 @@ defineEmits<{
 </style>
 
 <style lang="scss">
-// Global styles for status dropdown
-.v-list {
-  .v-list-item-icon {
-    margin-right: 12px;
-    min-width: 20px;
-    display: flex;
-    align-items: center;
-    
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--theme--foreground-subdued);
+/* Single source of truth for status-dot styling (issue #50).
+   Declared globally (not scoped) on purpose: this one definition covers BOTH
+   the in-component activator dot AND the teleported v-menu list dots. Two
+   <style> blocks in an SFC cannot share a SCSS mixin, and scoped styles cannot
+   reach the teleported v-list — so a single global rule is the only way to keep
+   one source. The class is namespaced (`lb-`) so this global rule never collides
+   with the sibling `expandable-blocks` extension's own global `.status-dot`
+   rules. StatusSelector is the only place status dots are styled. */
+.lb-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--theme--foreground-subdued);
 
-      &.status-published {
-        background: var(--theme--success);
-      }
-
-      &.status-draft {
-        background: var(--theme--warning);
-      }
-      
-      &.status-archived {
-        background: var(--theme--foreground-subdued);
-      }
-    }
+  &.status-published {
+    background: var(--theme--success);
   }
+
+  &.status-draft {
+    background: var(--theme--warning);
+  }
+
+  &.status-archived {
+    background: var(--theme--foreground-subdued);
+  }
+}
+
+.v-list .v-list-item-icon {
+  margin-right: 12px;
+  min-width: 20px;
+  display: flex;
+  align-items: center;
 }
 </style>
