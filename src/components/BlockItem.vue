@@ -223,13 +223,24 @@ function updateStatus(status: string) {
 </script>
 
 <style lang="scss" scoped>
+/* Card-surface + interactive-state values are inlined here (not via the shared
+   _theme.scss mixins) on purpose. In this extension's build
+   (`directus-extension build`), a rule whose declarations come from an SCSS
+   `@include` compiles to an UN-scoped global selector (verified: GridView's
+   `@include theme.recessed-surface` emits a global `.grid-area {}` in dist).
+   That is harmless for unique class names, but `.block-item` collides with the
+   sibling `expandable-blocks` extension's own global `.block-item` rules (legacy
+   vars, some `!important`) that would otherwise wipe the card border/background.
+   Inlining keeps these declarations scoped (`[data-v]`) so they out-specify the
+   sibling. Trade-off: the values duplicate #48's card-surface / interactive-
+   states mixins — keep them in sync if those tokens change. */
 .block-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: var(--theme--background-normal);
-  border: 1px solid var(--theme--border-color);
+  padding: 0.75rem;
+  background: var(--theme--background);
+  border: var(--theme--border-width) solid var(--theme--border-color);
   border-radius: var(--theme--border-radius);
   transition: all 0.2s;
   cursor: pointer;
@@ -237,7 +248,7 @@ function updateStatus(status: string) {
 
   &:hover {
     border-color: var(--theme--border-color-accent);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: var(--theme--background-normal);
   }
 
   &.selected {
@@ -250,22 +261,23 @@ function updateStatus(status: string) {
   }
 
   &.compact {
-    padding: 8px;
+    padding: 0.5rem;
 
     .block-content {
       .block-title {
         font-size: 13px;
       }
     }
+
+    .block-icon {
+      width: 32px;
+      height: 32px;
+    }
   }
-  
+
   &.dragging {
     opacity: 0.5;
-    background-color: var(--theme--primary-background);
-    border-color: var(--theme--primary);
-    /* dragging glow removed: no --theme--* token for a translucent primary shadow
-       (the full dragging/drag-preview visual is redesigned in #50) */
-    transform: scale(0.98);
+    border-style: dashed;
     cursor: grabbing !important;
   }
 }
@@ -277,7 +289,7 @@ function updateStatus(status: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--theme--background-accent);
+  background: var(--theme--background-normal);
   border-radius: var(--theme--border-radius);
 }
 
@@ -286,8 +298,9 @@ function updateStatus(status: string) {
   min-width: 0;
 
   .block-title {
+    font-family: var(--theme--fonts--title--font-family);
     font-weight: 600;
-    color: var(--theme--foreground);
+    color: var(--theme--foreground-accent);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
