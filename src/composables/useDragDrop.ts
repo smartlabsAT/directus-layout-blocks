@@ -1,10 +1,10 @@
 import { ref, type Ref } from 'vue';
-import type { BlockItem, AreaConfig } from '../types';
+import type { BlockItem, BlockId, AreaConfig } from '../types';
 import { createDragImage } from '../utils/blockHelpers';
 
 export interface DragDropOptions {
   onMove: (data: {
-    blockId: number;
+    blockId: BlockId;
     fromArea: string;
     toArea: string;
     toIndex: number;

@@ -20,18 +20,35 @@ export function isNotNullish(value: any): boolean {
   return value !== null && value !== undefined;
 }
 
+// Temporary-id prefixes used before the global Save assigns real junction PKs.
+// `new`  = a brand-new block (content created inline), `dup` = duplicated item,
+// `existing` = a link to an already-existing item, `temp`/`idx` = legacy/fallback.
+const TEMP_ID_PREFIXES = ['new', 'dup', 'existing', 'temp', 'idx'] as const;
+
+export type TempIdKind = 'new' | 'dup' | 'existing';
+
 /**
- * Generate a unique ID for temporary items
+ * Generate a unique temporary id for an unsaved block.
+ * The kind prefix lets {@link isExistingLink} distinguish linked items (whose
+ * source content must NOT be rewritten) from genuinely new content.
  */
-export function generateTempId(): string {
-  return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+export function generateTempId(kind: TempIdKind = 'new'): string {
+  return `${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
 
 /**
- * Check if an ID is a temporary ID
+ * Check if an id is a temporary (unsaved) id.
  */
-export function isTempId(id: any): boolean {
-  return typeof id === 'string' && id.startsWith('temp_');
+export function isTempId(id: unknown): boolean {
+  return typeof id === 'string' && TEMP_ID_PREFIXES.some(p => id.startsWith(`${p}_`));
+}
+
+/**
+ * Check if an id refers to a link to an existing item (`existing_` prefix).
+ * Such blocks must emit only the bare item PK so the source item is not mutated.
+ */
+export function isExistingLink(id: unknown): boolean {
+  return typeof id === 'string' && id.startsWith('existing_');
 }
 
 /**

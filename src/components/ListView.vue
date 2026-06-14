@@ -250,6 +250,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import type {
   BlockItem,
+  BlockId,
   AreaConfig,
   LayoutBlocksOptions,
   UserPermissions
@@ -272,14 +273,14 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'update:selectedArea': [area: string | null];
   'move-block': [data: {
-    blockId: number;
+    blockId: BlockId;
     fromArea: string;
     toArea: string;
     toIndex: number;
   }];
-  'remove-block': [blockId: number];
-  'duplicate-block': [blockId: number];
-  'update-block': [data: { blockId: number; updates?: any }];
+  'remove-block': [blockId: BlockId];
+  'duplicate-block': [blockId: BlockId];
+  'update-block': [data: { blockId: BlockId; updates?: any }];
   'add-block': [area?: string];
   'create-quick': [data: { area: string; collection: string }];
   'open-selector': [data: { area: string; collection: string }];
@@ -622,7 +623,9 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
     return;
   }
   
-  const blockId = parseInt(event.dataTransfer!.getData('block-id'));
+  // Keep the id as a string: temporary (unsaved) blocks have string ids and
+  // parseInt would yield NaN, breaking the move (see fix #40/#42).
+  const blockId = event.dataTransfer!.getData('block-id');
   const sourceArea = draggedBlock.value.area;
   
   // Don't do anything if dropping on same area

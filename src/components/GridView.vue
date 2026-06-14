@@ -104,11 +104,12 @@
 import { logger } from '../utils/logger';
 import { ref, computed } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
-import type { 
-  BlockItem, 
-  AreaConfig, 
+import type {
+  BlockItem,
+  BlockId,
+  AreaConfig,
   LayoutBlocksOptions,
-  UserPermissions 
+  UserPermissions
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
 
@@ -129,16 +130,16 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'update:selectedArea': [area: string | null];
   'move-block': [data: {
-    blockId: number;
+    blockId: BlockId;
     fromArea: string;
     toArea: string;
     toIndex: number;
   }];
-  'remove-block': [blockId: number];
-  'unlink-block': [blockId: number];
-  'delete-block': [blockId: number, deleteContent: boolean];
-  'update-block': [data: { blockId: number }];
-  'duplicate-block': [blockId: number];
+  'remove-block': [blockId: BlockId];
+  'unlink-block': [blockId: BlockId];
+  'delete-block': [blockId: BlockId, deleteContent: boolean];
+  'update-block': [data: { blockId: BlockId }];
+  'duplicate-block': [blockId: BlockId];
   'add-block': [area?: string];
   'create-quick': [data: { area: string; collection: string }];
   'open-selector': [data: { area: string; collection: string }];
@@ -422,8 +423,10 @@ function handleDrop(event: DragEvent, targetArea: AreaConfig) {
   let dropIndex = getAreaBlocks(targetArea.id).length;
   
   if (blockElement) {
-    const targetBlockId = parseInt(blockElement.getAttribute('data-block-id') || '0');
-    const targetBlock = props.blocks.find(b => b.id === targetBlockId);
+    // Compare as strings: temporary (unsaved) blocks carry string ids, so
+    // parseInt would yield NaN and break drop-targeting (see fix #40/#42).
+    const targetBlockId = blockElement.getAttribute('data-block-id') || '';
+    const targetBlock = props.blocks.find(b => String(b.id) === targetBlockId);
     if (targetBlock) {
       dropIndex = getAreaBlocks(targetArea.id).indexOf(targetBlock);
     }
