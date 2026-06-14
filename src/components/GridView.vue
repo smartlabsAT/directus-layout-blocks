@@ -276,10 +276,10 @@ function createDragImage(block: BlockItem): HTMLElement {
     top: -1000px;
     left: -1000px;
     background: var(--theme--background);
-    border: 2px solid var(--theme--primary);
+    border: var(--theme--border-width) solid var(--theme--primary);
     border-radius: var(--theme--border-radius);
     padding: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--theme--popover--menu--box-shadow);
     font-family: var(--theme--fonts--sans--font-family);
     display: flex;
     flex-direction: column;
@@ -300,9 +300,16 @@ function createDragImage(block: BlockItem): HTMLElement {
     color: var(--theme--foreground);
   `;
   
-  const icon = document.createElement('span');
-  icon.innerHTML = '📦';
-  header.appendChild(icon);
+  // Real collection icon (no emoji): clone the dragged block's already-rendered
+  // icon node. The Material Symbols font is applied via the v-icon component's
+  // SCOPED styles (its data-v attribute), so a hand-built node would render no
+  // glyph — the clone carries that scope attribute and renders correctly.
+  const sourceIcon = document.querySelector(
+    `.block-item[data-block-id=${CSS.escape(String(block.id))}] .block-icon .v-icon`
+  );
+  if (sourceIcon) {
+    header.appendChild(sourceIcon.cloneNode(true));
+  }
   
   const title = document.createElement('span');
   title.textContent = getBlockTitle(block);
@@ -399,6 +406,18 @@ function handleDragOver(event: DragEvent, area: AreaConfig) {
 
 function handleDragLeave(event: DragEvent) {
   const areaElement = event.currentTarget as HTMLElement;
+  // dragleave also fires when the pointer moves onto a child element (a block, the
+  // header). Only clear the drag state when the pointer is actually outside the area
+  // bounds — otherwise .drag-over rapidly toggles and the drop-zone highlight
+  // flickers as the cursor moves over the blocks inside the area. (relatedTarget is
+  // unreliable during native DnD, so check the pointer position against the rect.)
+  const rect = areaElement.getBoundingClientRect();
+  if (
+    event.clientX >= rect.left && event.clientX <= rect.right &&
+    event.clientY >= rect.top && event.clientY <= rect.bottom
+  ) {
+    return;
+  }
   areaElement.classList.remove('drag-not-allowed');
   areaElement.classList.remove('drag-over');
   dragOverArea.value = null;
@@ -481,6 +500,8 @@ function handleAddBlock(areaId: string) {
 </script>
 
 <style lang="scss" scoped>
+@use '../styles/theme' as theme;
+
 .layout-blocks-grid-view {
   height: 100%;
   display: flex;
@@ -514,9 +535,7 @@ function handleAddBlock(areaId: string) {
 }
 
 .grid-area {
-  background: var(--theme--background-subdued);
-  border: 1px solid black; /* Always visible subtle border */
-  border-radius: var(--theme--border-radius);
+  @include theme.recessed-surface; /* bg-subdued + 1px token border + radius (replaces the old hardcoded black border) */
   display: flex;
   flex-direction: column;
   min-height: 200px;
@@ -527,19 +546,13 @@ function handleAddBlock(areaId: string) {
   box-sizing: border-box;
   margin-bottom: 0px; /* For wrapping */
   position: relative;
-  outline: 1px solid var(--theme--border-color-subdued); /* Double border effect */
-  outline-offset: -2px;
 
   &:hover {
-    border-color: var(--theme--border-color);
-    background: var(--theme--background-normal);
-    outline-color: var(--theme--border-color);
+    border-color: var(--theme--border-color-accent);
   }
 
   &.selected {
     border-color: var(--theme--primary);
-    outline-color: var(--theme--primary);
-    outline-width: 2px;
     background: var(--theme--primary-background);
   }
 
@@ -549,27 +562,22 @@ function handleAddBlock(areaId: string) {
   }
 
   &.drag-over {
-    border-color: var(--theme--primary);
-    outline-color: var(--theme--primary-subdued);
-    outline-width: 2px;
-    background: var(--theme--primary-background);
+    @include theme.drop-zone-valid;
   }
 
   &.empty:not(.drag-over) {
     .area-content {
       opacity: 0.7;
     }
-    
+
     .empty-state {
       color: var(--theme--foreground-subdued);
     }
   }
 
   &.drag-not-allowed {
+    @include theme.drop-zone-invalid;
     cursor: not-allowed;
-    background: var(--theme--danger-background);
-    border-color: var(--theme--danger);
-    outline-color: var(--theme--danger);
     opacity: 0.7;
   }
 }
@@ -580,21 +588,20 @@ function handleAddBlock(areaId: string) {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 2px solid var(--theme--border-color);
+  border-bottom: var(--theme--border-width) solid var(--theme--border-color);
   background: var(--theme--background-accent);
-  border-radius: calc(var(--theme--border-radius) - 2px) calc(var(--theme--border-radius) - 2px) 0 0;
+  border-radius: var(--theme--border-radius) var(--theme--border-radius) 0 0;
   min-height: 48px;
 
   .area-title {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: var(--theme--fonts--title--font-family);
     font-weight: 600;
     font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--theme--foreground);
-    
+    color: var(--theme--foreground-accent);
+
     .v-icon {
       color: var(--theme--foreground-subdued);
     }
@@ -691,24 +698,5 @@ function handleAddBlock(areaId: string) {
 
 :deep(.sortable-drag) {
   opacity: 0;
-}
-</style>
-
-<style lang="scss">
-// Global styles for drag state.
-// The drop hint is drawn as an absolutely-positioned overlay rather than a
-// border, so it never changes the header box height. A border would reflow the
-// content below it, and since drag-over toggles continuously while the pointer
-// moves, that made the blocks jump by the border width.
-body.dragging-block {
-  .grid-area:not(.drag-over) .area-header::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-bottom: 2px dashed var(--theme--primary);
-    pointer-events: none;
-  }
 }
 </style>
