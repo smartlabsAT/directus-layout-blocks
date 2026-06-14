@@ -62,7 +62,7 @@ defineEmits<{
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-radius: var(--border-radius);
+  border-radius: var(--theme--border-radius);
   font-size: 13px;
   transition: background-color 0.2s;
   
@@ -70,7 +70,7 @@ defineEmits<{
     cursor: pointer;
     
     &:hover {
-      background-color: var(--background-normal-alt);
+      background-color: var(--theme--background-accent);
     }
   }
   
@@ -78,24 +78,24 @@ defineEmits<{
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--foreground-subdued);
+    background: var(--theme--foreground-subdued);
     flex-shrink: 0;
 
     &.status-published {
-      background: var(--success);
+      background: var(--theme--success);
     }
 
     &.status-draft {
-      background: var(--warning);
+      background: var(--theme--warning);
     }
     
     &.status-archived {
-      background: var(--foreground-subdued);
+      background: var(--theme--foreground-subdued);
     }
   }
   
   .status-text {
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   }
 }
 </style>
@@ -113,18 +113,18 @@ defineEmits<{
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--foreground-subdued);
+      background: var(--theme--foreground-subdued);
 
       &.status-published {
-        background: var(--success);
+        background: var(--theme--success);
       }
 
       &.status-draft {
-        background: var(--warning);
+        background: var(--theme--warning);
       }
       
       &.status-archived {
-        background: var(--foreground-subdued);
+        background: var(--theme--foreground-subdued);
       }
     }
   }

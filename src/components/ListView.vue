@@ -527,15 +527,15 @@ function createDragImage(block: BlockItem): HTMLElement {
     position: absolute;
     top: -1000px;
     left: -1000px;
-    background: var(--background-page);
-    border: 2px solid var(--primary);
-    border-radius: var(--border-radius);
+    background: var(--theme--background);
+    border: 2px solid var(--theme--primary);
+    border-radius: var(--theme--border-radius);
     padding: 12px 16px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    font-family: var(--font-family);
+    font-family: var(--theme--fonts--sans--font-family);
     font-size: 14px;
     font-weight: 600;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -696,7 +696,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   display: flex;
   gap: 2px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--border-normal);
+  border-bottom: 1px solid var(--theme--border-color);
   overflow-x: auto;
   align-items: center;
 
@@ -705,24 +705,28 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     align-items: center;
     gap: 4px;
     padding: 8px 10px;
-    background: var(--background-normal);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--border-radius);
+    background: var(--theme--background-normal);
+    border: 1px solid var(--theme--border-color);
+    border-radius: var(--theme--border-radius);
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s;
 
     &:hover {
-      background: var(--background-normal-alt);
+      background: var(--theme--background-accent);
     }
 
+    /* FIXME(#47 -> #51): on-primary text has no --theme--* token. The white-on-primary
+       active tab (filled background + inverted text) is removed by the ListView redesign
+       (#51, segmented tabs with an underline indicator). Intentionally left on the legacy
+       --foreground-inverted until then; excluded from the #48 token-migration gate. */
     &.active {
-      background: var(--primary);
+      background: var(--theme--primary);
       color: var(--foreground-inverted);
-      border-color: var(--primary);
+      border-color: var(--theme--primary);
 
       .v-chip {
-        background: var(--primary-alt);
+        background: var(--theme--primary-background);
         color: var(--foreground-inverted);
       }
     }
@@ -733,20 +737,20 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     
     &.orphaned {
       .v-chip.warning {
-        background: var(--warning-25);
-        color: var(--warning);
+        background: var(--theme--warning-background);
+        color: var(--theme--warning);
       }
     }
     
     &.drag-hover {
-      background: var(--primary-25);
-      border-color: var(--primary);
+      background: var(--theme--primary-background);
+      border-color: var(--theme--primary);
     }
     
     &.drag-not-allowed {
       cursor: not-allowed;
-      background: var(--danger-10);
-      border-color: var(--danger);
+      background: var(--theme--danger-background);
+      border-color: var(--theme--danger);
       opacity: 0.7;
     }
   }
@@ -773,18 +777,18 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   .blocks-table {
     width: 100%;
     border-collapse: collapse;
-    border: 1px solid var(--border-subdued);
-    border-radius: var(--border-radius);
+    border: 1px solid var(--theme--border-color-subdued);
+    border-radius: var(--theme--border-radius);
     overflow: hidden;
     
     thead {
       position: sticky;
       top: 0;
-      background: var(--background-normal-alt);
+      background: var(--theme--background-accent);
       z-index: 1;
       
       tr {
-        border-bottom: 2px solid var(--border-normal);
+        border-bottom: 2px solid var(--theme--border-color);
       }
       
       th {
@@ -792,10 +796,10 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         text-align: left;
         font-weight: 600;
         font-size: 12px;
-        color: var(--foreground-subdued);
+        color: var(--theme--foreground-subdued);
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        border-right: 1px solid var(--border-subdued);
+        border-right: 1px solid var(--theme--border-color-subdued);
         
         &:last-child {
           border-right: none;
@@ -807,7 +811,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
           gap: 6px;
           
           .v-icon {
-            color: var(--foreground-subdued);
+            color: var(--theme--foreground-subdued);
           }
         }
       }
@@ -815,7 +819,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     
     tbody {
       tr.block-row {
-        border-bottom: 1px solid var(--border-subdued);
+        border-bottom: 1px solid var(--theme--border-color-subdued);
         transition: background-color 0.2s;
         
         &:last-child {
@@ -824,15 +828,15 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         
         &:hover {
           td {
-            background-color: var(--background-normal-alt);
+            background-color: var(--theme--background-accent);
           }
         }
         
         td {
           padding: 12px 16px;
           vertical-align: middle;
-          border-right: 1px solid var(--border-subdued);
-          background: var(--background-page);
+          border-right: 1px solid var(--theme--border-color-subdued);
+          background: var(--theme--background);
           
           &:last-child {
             border-right: none;
@@ -840,13 +844,13 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
           
           &.drag-cell {
             padding: 8px;
-            background: var(--background-normal);
+            background: var(--theme--background-normal);
           }
           
           &.icon-cell {
-            color: var(--foreground-subdued);
+            color: var(--theme--foreground-subdued);
             padding: 8px;
-            background: var(--background-normal);
+            background: var(--theme--background-normal);
           }
           
           &.title-cell {
@@ -869,9 +873,9 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
               font-size: 12px;
               
               &.orphaned-chip {
-                background: var(--warning-25);
-                color: var(--warning);
-                border-color: var(--warning);
+                background: var(--theme--warning-background);
+                color: var(--theme--warning);
+                border-color: var(--theme--warning);
               }
             }
           }
@@ -882,14 +886,14 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   
   .drag-handle {
     cursor: grab;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 4px;
     
     &:hover {
-      color: var(--foreground-normal);
+      color: var(--theme--foreground);
     }
     
     &:active {
@@ -900,7 +904,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   .block-title-cell {
     .subtitle {
       font-size: 12px;
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
       margin-top: 4px;
     }
   }
@@ -911,7 +915,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
       align-items: center;
       gap: 8px;
       padding: 4px 8px;
-      border-radius: var(--border-radius);
+      border-radius: var(--theme--border-radius);
       font-size: 13px;
       transition: background-color 0.2s;
       
@@ -919,7 +923,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         cursor: pointer;
         
         &:hover {
-          background-color: var(--background-normal-alt);
+          background-color: var(--theme--background-accent);
         }
       }
       
@@ -927,24 +931,24 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--foreground-subdued);
+        background: var(--theme--foreground-subdued);
         flex-shrink: 0;
 
         &.status-published {
-          background: var(--success);
+          background: var(--theme--success);
         }
 
         &.status-draft {
-          background: var(--warning);
+          background: var(--theme--warning);
         }
         
         &.status-archived {
-          background: var(--foreground-subdued);
+          background: var(--theme--foreground-subdued);
         }
       }
       
       .status-text {
-        color: var(--foreground-normal);
+        color: var(--theme--foreground);
       }
     }
   }
@@ -955,8 +959,8 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     justify-content: flex-end;
     
     .danger {
-      --v-button-background-color-hover: var(--danger-10);
-      --v-button-color-hover: var(--danger);
+      --v-button-background-color-hover: var(--theme--danger-background);
+      --v-button-color-hover: var(--theme--danger);
     }
   }
 }
@@ -968,7 +972,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
 
   p {
     margin: 0;
@@ -977,14 +981,14 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 
 .area-footer {
   padding: 16px;
-  border-top: 1px solid var(--border-subdued);
+  border-top: 1px solid var(--theme--border-color-subdued);
   display: flex;
   align-items: center;
   gap: 16px;
 
   span {
     font-size: 14px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 
@@ -993,7 +997,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
 }
 </style>
 
@@ -1010,18 +1014,18 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--foreground-subdued);
+      background: var(--theme--foreground-subdued);
 
       &.status-published {
-        background: var(--success);
+        background: var(--theme--success);
       }
 
       &.status-draft {
-        background: var(--warning);
+        background: var(--theme--warning);
       }
       
       &.status-archived {
-        background: var(--foreground-subdued);
+        background: var(--theme--foreground-subdued);
       }
     }
   }
@@ -1036,7 +1040,7 @@ body.dragging-block {
     // style. A border change revealed a hidden border width and grew the tab,
     // reflowing the content and making the blocks jump while dragging.
     &:not(.active) {
-      outline: 2px dashed var(--primary);
+      outline: 2px dashed var(--theme--primary);
       outline-offset: -2px;
     }
   }
@@ -1045,9 +1049,9 @@ body.dragging-block {
   .block-row {
     &.dragging {
       opacity: 0.5;
-      background-color: var(--primary-25) !important;
-      border-color: var(--primary) !important;
-      box-shadow: 0 2px 8px var(--primary-25);
+      background-color: var(--theme--primary-background) !important;
+      border-color: var(--theme--primary) !important;
+      box-shadow: 0 2px 8px var(--theme--primary-background);
     }
   }
 }

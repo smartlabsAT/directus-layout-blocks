@@ -43,7 +43,7 @@ defineEmits<{
   justify-content: center;
   gap: 16px;
   padding: 40px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
   text-align: center;
   min-height: 200px;
 
@@ -53,7 +53,7 @@ defineEmits<{
   }
 
   .v-icon {
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 </style>

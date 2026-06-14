@@ -1651,7 +1651,7 @@ watch(() => props.value, () => {
   justify-content: center;
   height: 100%;
   gap: var(--spacing);
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
 
   p {
     margin: 0;
@@ -1674,9 +1674,9 @@ watch(() => props.value, () => {
     .error-help {
       margin-top: 16px;
       text-align: left;
-      background: var(--background-subdued);
+      background: var(--theme--background-subdued);
       padding: 16px;
-      border-radius: var(--border-radius);
+      border-radius: var(--theme--border-radius);
       
       ol {
         margin: 8px 0 0 20px;
@@ -1704,7 +1704,7 @@ watch(() => props.value, () => {
     
     p {
       margin: 0;
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 }
@@ -1721,7 +1721,7 @@ watch(() => props.value, () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border-normal);
+  border-bottom: 1px solid var(--theme--border-color);
   flex-shrink: 0;
 
   .toolbar-left,
@@ -1742,10 +1742,10 @@ watch(() => props.value, () => {
     align-items: center;
     gap: 8px;
     padding: 4px 12px;
-    background: var(--background-subdued);
-    border-radius: var(--border-radius);
+    background: var(--theme--background-subdued);
+    border-radius: var(--theme--border-radius);
     font-size: 14px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 

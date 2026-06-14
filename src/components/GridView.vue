@@ -69,7 +69,7 @@
 
           <!-- Empty State -->
           <div v-else class="area-empty">
-            <v-icon name="inbox" large color="--foreground-subdued" />
+            <v-icon name="inbox" large />
             <p>{{ area.locked ? 'Area is locked' : 'No blocks in this area' }}</p>
             <AddBlockDropdown
               v-if="!area.locked && permissions.create"
@@ -275,12 +275,12 @@ function createDragImage(block: BlockItem): HTMLElement {
     position: absolute;
     top: -1000px;
     left: -1000px;
-    background: var(--background-page);
-    border: 2px solid var(--primary);
-    border-radius: var(--border-radius);
+    background: var(--theme--background);
+    border: 2px solid var(--theme--primary);
+    border-radius: var(--theme--border-radius);
     padding: 16px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    font-family: var(--font-family);
+    font-family: var(--theme--fonts--sans--font-family);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -297,7 +297,7 @@ function createDragImage(block: BlockItem): HTMLElement {
     gap: 8px;
     font-weight: 600;
     font-size: 14px;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   `;
   
   const icon = document.createElement('span');
@@ -314,7 +314,7 @@ function createDragImage(block: BlockItem): HTMLElement {
   const meta = document.createElement('div');
   meta.style.cssText = `
     font-size: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   `;
   meta.textContent = getCollectionLabel(block);
   dragImage.appendChild(meta);
@@ -514,9 +514,9 @@ function handleAddBlock(areaId: string) {
 }
 
 .grid-area {
-  background: var(--background-subdued);
+  background: var(--theme--background-subdued);
   border: 1px solid black; /* Always visible subtle border */
-  border-radius: var(--border-radius);
+  border-radius: var(--theme--border-radius);
   display: flex;
   flex-direction: column;
   min-height: 200px;
@@ -527,20 +527,20 @@ function handleAddBlock(areaId: string) {
   box-sizing: border-box;
   margin-bottom: 0px; /* For wrapping */
   position: relative;
-  outline: 1px solid var(--border-subdued); /* Double border effect */
+  outline: 1px solid var(--theme--border-color-subdued); /* Double border effect */
   outline-offset: -2px;
 
   &:hover {
-    border-color: var(--border-normal);
-    background: var(--background-normal);
-    outline-color: var(--border-normal);
+    border-color: var(--theme--border-color);
+    background: var(--theme--background-normal);
+    outline-color: var(--theme--border-color);
   }
 
   &.selected {
-    border-color: var(--primary);
-    outline-color: var(--primary);
+    border-color: var(--theme--primary);
+    outline-color: var(--theme--primary);
     outline-width: 2px;
-    background: var(--primary-10);
+    background: var(--theme--primary-background);
   }
 
   &.locked {
@@ -549,10 +549,10 @@ function handleAddBlock(areaId: string) {
   }
 
   &.drag-over {
-    border-color: var(--primary);
-    outline-color: var(--primary-50);
+    border-color: var(--theme--primary);
+    outline-color: var(--theme--primary-subdued);
     outline-width: 2px;
-    background: var(--primary-alt);
+    background: var(--theme--primary-background);
   }
 
   &.empty:not(.drag-over) {
@@ -561,15 +561,15 @@ function handleAddBlock(areaId: string) {
     }
     
     .empty-state {
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 
   &.drag-not-allowed {
     cursor: not-allowed;
-    background: var(--danger-10);
-    border-color: var(--danger);
-    outline-color: var(--danger);
+    background: var(--theme--danger-background);
+    border-color: var(--theme--danger);
+    outline-color: var(--theme--danger);
     opacity: 0.7;
   }
 }
@@ -580,9 +580,9 @@ function handleAddBlock(areaId: string) {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 2px solid var(--border-normal);
-  background: var(--background-normal-alt);
-  border-radius: calc(var(--border-radius) - 2px) calc(var(--border-radius) - 2px) 0 0;
+  border-bottom: 2px solid var(--theme--border-color);
+  background: var(--theme--background-accent);
+  border-radius: calc(var(--theme--border-radius) - 2px) calc(var(--theme--border-radius) - 2px) 0 0;
   min-height: 48px;
 
   .area-title {
@@ -593,10 +593,10 @@ function handleAddBlock(areaId: string) {
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
     
     .v-icon {
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 
@@ -628,7 +628,7 @@ function handleAddBlock(areaId: string) {
   height: 100%;
   min-height: 120px;
   text-align: center;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
 
   p {
     margin: 8px 0 16px;
@@ -638,16 +638,16 @@ function handleAddBlock(areaId: string) {
 
 .area-footer {
   padding: 8px 12px;
-  border-top: 1px solid var(--border-subdued);
+  border-top: 1px solid var(--theme--border-color-subdued);
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--background-normal);
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  background: var(--theme--background-normal);
+  border-radius: 0 0 var(--theme--border-radius) var(--theme--border-radius);
 
   .area-limit {
     font-size: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 
@@ -707,7 +707,7 @@ body.dragging-block {
     left: 0;
     right: 0;
     bottom: 0;
-    border-bottom: 2px dashed var(--primary);
+    border-bottom: 2px dashed var(--theme--primary);
     pointer-events: none;
   }
 }

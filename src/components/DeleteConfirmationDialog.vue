@@ -165,25 +165,25 @@ function handleCancel() {
   display: flex;
   align-items: flex-start;
   padding: 12px;
-  border: 2px solid var(--border-normal);
-  border-radius: var(--border-radius);
+  border: 2px solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
   cursor: pointer;
   transition: all 0.2s;
-  background: var(--background-page);
+  background: var(--theme--background);
 
   &:hover {
-    border-color: var(--primary-25);
-    background: var(--background-normal);
+    border-color: var(--theme--primary-background);
+    background: var(--theme--background-normal);
   }
 
   &.selected {
-    border-color: var(--primary);
-    background: var(--primary-10);
+    border-color: var(--theme--primary);
+    background: var(--theme--primary-background);
   }
 
   &.danger.selected {
-    border-color: var(--danger);
-    background: var(--danger-10);
+    border-color: var(--theme--danger);
+    background: var(--theme--danger-background);
   }
 
   input[type="radio"] {
@@ -205,25 +205,25 @@ function handleCancel() {
 
   .v-icon {
     margin-top: 2px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 
   .option-title {
     font-weight: 500;
     margin-bottom: 4px;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   }
 
   .option-description {
     font-size: 13px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     line-height: 1.4;
   }
 }
 
 .danger {
   .v-icon {
-    color: var(--danger);
+    color: var(--theme--danger);
   }
 }
 

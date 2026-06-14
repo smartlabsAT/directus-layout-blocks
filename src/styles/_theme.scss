@@ -1,0 +1,44 @@
+// Shared theme helpers for the Layout Blocks redesign (epic #47).
+// Token-only — every value resolves to a Directus 11 `--theme--*` token.
+// Consumed by the per-surface redesigns (#49–#55), e.g. in a component:
+//   @use '../styles/theme' as theme;
+//   .grid-area { @include theme.recessed-surface; @include theme.interactive-states; }
+// See docs/design/design_handoff_layout_blocks/{README.md §4–§7, COMPONENT_MAP.md}.
+
+// A card that sits on top of the page / a recessed area (one step "up").
+@mixin card-surface {
+  background: var(--theme--background);
+  border: var(--theme--border-width) solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
+}
+
+// A recessed container (the area card that holds blocks).
+@mixin recessed-surface {
+  background: var(--theme--background-subdued);
+  border: var(--theme--border-width) solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
+}
+
+// Shared hover + selected interactive states (no resting shadow).
+@mixin interactive-states {
+  &:hover {
+    border-color: var(--theme--border-color-accent);
+    background: var(--theme--background-normal);
+  }
+
+  &.selected {
+    border-color: var(--theme--primary);
+    background: var(--theme--primary-background);
+  }
+}
+
+// Drag-and-drop target highlighting.
+@mixin drop-zone-valid {
+  border: var(--theme--border-width) dashed var(--theme--primary);
+  background: var(--theme--primary-background);
+}
+
+@mixin drop-zone-invalid {
+  border: var(--theme--border-width) dashed var(--theme--danger);
+  background: var(--theme--danger-background);
+}
