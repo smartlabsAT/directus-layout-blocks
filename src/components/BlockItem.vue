@@ -224,12 +224,16 @@ function updateStatus(status: string) {
 
 <style lang="scss" scoped>
 /* Card-surface + interactive-state values are inlined here (not via the shared
-   _theme.scss mixins) on purpose: an `@include`d mixin compiles to an UN-scoped
-   global selector in this build, and `.block-item` collides with the sibling
-   `expandable-blocks` extension's own global `.block-item` rules (legacy vars,
-   some `!important`). Inlining keeps these declarations scoped (`[data-v]`) so
-   they out-specify the sibling. Token values mirror #48's card-surface /
-   interactive-states mixins. */
+   _theme.scss mixins) on purpose. In this extension's build
+   (`directus-extension build`), a rule whose declarations come from an SCSS
+   `@include` compiles to an UN-scoped global selector (verified: GridView's
+   `@include theme.recessed-surface` emits a global `.grid-area {}` in dist).
+   That is harmless for unique class names, but `.block-item` collides with the
+   sibling `expandable-blocks` extension's own global `.block-item` rules (legacy
+   vars, some `!important`) that would otherwise wipe the card border/background.
+   Inlining keeps these declarations scoped (`[data-v]`) so they out-specify the
+   sibling. Trade-off: the values duplicate #48's card-surface / interactive-
+   states mixins — keep them in sync if those tokens change. */
 .block-item {
   display: flex;
   align-items: center;
