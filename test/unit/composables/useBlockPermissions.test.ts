@@ -201,10 +201,10 @@ describe('useBlockPermissions Composable', () => {
       let result = validation.validateMoveBlock('main', 'sidebar', 'content_text');
       expect(result.valid).toBe(true);
       
-      // Without update permission
+      // Since #40 moving only updates the junction row's area/sort; authorization
+      // is enforced server-side, so the client-side gate always passes.
       result = validation.validateMoveBlock('main', 'sidebar', 'content_image');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('do not have permission to move');
+      expect(result.valid).toBe(true);
     });
 
     it('should validate delete permissions', () => {
