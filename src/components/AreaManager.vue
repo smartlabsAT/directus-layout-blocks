@@ -429,7 +429,7 @@ function save() {
 const IconPicker = {
   template: `
     <div class="icon-picker">
-      <p style="padding: 12px; color: var(--foreground-subdued);">
+      <p style="padding: 12px; color: var(--theme--foreground-subdued);">
         Icon picker not implemented
       </p>
     </div>
@@ -461,7 +461,7 @@ defineExpose({
 
   p {
     margin: 0;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 
@@ -476,7 +476,7 @@ defineExpose({
 .area-section {
   h4 {
     margin: 0 0 16px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     font-size: 14px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -492,9 +492,9 @@ defineExpose({
 
 .areas-table-wrapper {
   overflow-x: auto;
-  border: 1px solid var(--border-subdued);
-  border-radius: var(--border-radius);
-  background: var(--background-page);
+  border: 1px solid var(--theme--border-color-subdued);
+  border-radius: var(--theme--border-radius);
+  background: var(--theme--background);
 }
 
 .areas-table {
@@ -502,28 +502,28 @@ defineExpose({
   border-collapse: collapse;
   
   thead {
-    background: var(--background-normal-alt);
+    background: var(--theme--background-accent);
     
     th {
       padding: 12px;
       text-align: left;
       font-weight: 600;
       font-size: 12px;
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      border-bottom: 2px solid var(--border-normal);
+      border-bottom: 2px solid var(--theme--border-color);
     }
   }
   
   tbody {
     tr {
-      border-bottom: 1px solid var(--border-subdued);
-      background: var(--background-page);
+      border-bottom: 1px solid var(--theme--border-color-subdued);
+      background: var(--theme--background);
       transition: background-color 0.2s;
       
       &:hover {
-        background: var(--background-normal);
+        background: var(--theme--background-normal);
       }
       
       &:last-child {
@@ -567,7 +567,7 @@ defineExpose({
 
 .drag-handle {
   cursor: grab;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -578,13 +578,13 @@ defineExpose({
   }
   
   &:hover {
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   }
 }
 
 .editable-value {
   padding: 6px 10px;
-  border-radius: var(--border-radius);
+  border-radius: var(--theme--border-radius);
   cursor: pointer;
   user-select: none;
   min-height: 32px;
@@ -593,13 +593,13 @@ defineExpose({
   transition: all 0.2s;
   
   &:not(.locked):hover {
-    background: var(--background-normal-alt);
-    box-shadow: inset 0 0 0 1px var(--border-normal);
+    background: var(--theme--background-accent);
+    box-shadow: inset 0 0 0 1px var(--theme--border-color);
   }
   
   &.locked {
     cursor: default;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 
@@ -616,7 +616,7 @@ defineExpose({
   }
   
   .no-collections {
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     font-style: italic;
     font-size: 13px;
     padding: 4px 0;
@@ -630,11 +630,11 @@ defineExpose({
 .empty-state {
   text-align: center;
   padding: 40px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
 }
 
 .danger {
-  --v-button-background-color-hover: var(--danger-10);
-  --v-button-color-hover: var(--danger);
+  --v-button-background-color-hover: var(--theme--danger-background);
+  --v-button-color-hover: var(--theme--danger);
 }
 </style>

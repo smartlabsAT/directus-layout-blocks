@@ -188,7 +188,7 @@ const canDeleteContent = computed(() => {
 // Methods
 function getBlockColor(): string {
   // You can implement custom color logic here
-  return '--foreground-normal';
+  return 'var(--theme--foreground)';
 }
 
 function handleClick() {
@@ -228,21 +228,21 @@ function updateStatus(status: string) {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--background-normal);
-  border: 1px solid var(--border-normal);
-  border-radius: var(--border-radius);
+  background: var(--theme--background-normal);
+  border: 1px solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
   transition: all 0.2s;
   cursor: pointer;
   user-select: none;
 
   &:hover {
-    border-color: var(--border-normal-alt);
+    border-color: var(--theme--border-color-accent);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   &.selected {
-    border-color: var(--primary);
-    background: var(--primary-alt);
+    border-color: var(--theme--primary);
+    background: var(--theme--primary-background);
   }
 
   &.draggable {
@@ -261,9 +261,10 @@ function updateStatus(status: string) {
   
   &.dragging {
     opacity: 0.5;
-    background-color: var(--primary-25);
-    border-color: var(--primary);
-    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.2);
+    background-color: var(--theme--primary-background);
+    border-color: var(--theme--primary);
+    /* dragging glow removed: no --theme--* token for a translucent primary shadow
+       (the full dragging/drag-preview visual is redesigned in #50) */
     transform: scale(0.98);
     cursor: grabbing !important;
   }
@@ -276,8 +277,8 @@ function updateStatus(status: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--background-normal-alt);
-  border-radius: var(--border-radius);
+  background: var(--theme--background-accent);
+  border-radius: var(--theme--border-radius);
 }
 
 .block-content {
@@ -286,7 +287,7 @@ function updateStatus(status: string) {
 
   .block-title {
     font-weight: 600;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -294,7 +295,7 @@ function updateStatus(status: string) {
 
   .block-subtitle {
     font-size: 13px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -316,9 +317,9 @@ function updateStatus(status: string) {
 }
 
 :deep(.v-list-item.danger) {
-  --v-list-item-color: var(--danger);
-  --v-list-item-color-hover: var(--danger);
-  --v-list-item-icon-color: var(--danger);
+  --v-list-item-color: var(--theme--danger);
+  --v-list-item-color-hover: var(--theme--danger);
+  --v-list-item-icon-color: var(--theme--danger);
 }
 
 :deep(.v-list) {
@@ -332,7 +333,7 @@ function updateStatus(status: string) {
 
 .list-item-subtitle {
   font-size: 12px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
   margin-top: 2px;
 }
 </style>

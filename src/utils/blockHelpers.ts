@@ -79,12 +79,12 @@ export function createDragImage(block: BlockItem): HTMLElement {
     position: absolute;
     top: -1000px;
     left: -1000px;
-    background: var(--background-page);
-    border: 2px solid var(--primary);
-    border-radius: var(--border-radius);
+    background: var(--theme--background);
+    border: 2px solid var(--theme--primary);
+    border-radius: var(--theme--border-radius);
     padding: 16px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    font-family: var(--font-family);
+    font-family: var(--theme--fonts--sans--font-family);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -101,7 +101,7 @@ export function createDragImage(block: BlockItem): HTMLElement {
     gap: 8px;
     font-weight: 600;
     font-size: 14px;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   `;
   
   const icon = document.createElement('span');
@@ -118,7 +118,7 @@ export function createDragImage(block: BlockItem): HTMLElement {
   const meta = document.createElement('div');
   meta.style.cssText = `
     font-size: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   `;
   meta.textContent = getCollectionLabel(block.collection);
   dragImage.appendChild(meta);

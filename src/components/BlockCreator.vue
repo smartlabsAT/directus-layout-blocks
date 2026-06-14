@@ -565,7 +565,7 @@ watch(selectedCollection, () => {
   width: 700px;
   max-width: 90vw;
   background: white;
-  border-radius: var(--border-radius);
+  border-radius: var(--theme--border-radius);
   overflow: hidden;
 }
 
@@ -582,7 +582,7 @@ watch(selectedCollection, () => {
 
   p {
     margin: 0;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 
@@ -598,7 +598,7 @@ watch(selectedCollection, () => {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     font-size: 14px;
   }
 }
@@ -622,33 +622,33 @@ watch(selectedCollection, () => {
   flex-direction: column;
   align-items: center;
   padding: 20px 16px;
-  background: var(--background-subdued);
-  border: 2px solid var(--border-subdued);
-  border-radius: var(--border-radius);
+  background: var(--theme--background-subdued);
+  border: 2px solid var(--theme--border-color-subdued);
+  border-radius: var(--theme--border-radius);
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
   min-height: 140px;
 
   &:hover {
-    background: var(--background-normal);
-    border-color: var(--border-normal);
+    background: var(--theme--background-normal);
+    border-color: var(--theme--border-color);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 
   &.selected {
-    background: var(--primary-10);
-    border-color: var(--primary);
+    background: var(--theme--primary-background);
+    border-color: var(--theme--primary);
     
     .tile-icon {
-      color: var(--primary);
+      color: var(--theme--primary);
     }
   }
 
   .tile-icon {
     margin-bottom: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     transition: color 0.2s;
   }
 
@@ -661,12 +661,12 @@ watch(selectedCollection, () => {
   .tile-title {
     font-weight: 600;
     font-size: 14px;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground);
   }
 
   .tile-description {
     font-size: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     line-height: 1.4;
   }
 }
@@ -691,7 +691,7 @@ watch(selectedCollection, () => {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     font-size: 14px;
   }
 
@@ -700,9 +700,9 @@ watch(selectedCollection, () => {
     align-items: center;
     gap: 12px;
     padding: 16px;
-    background: var(--background-subdued);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--border-radius);
+    background: var(--theme--background-subdued);
+    border: 1px solid var(--theme--border-color);
+    border-radius: var(--theme--border-radius);
 
     .preview-content {
       flex: 1;
@@ -711,12 +711,12 @@ watch(selectedCollection, () => {
       gap: 4px;
 
       strong {
-        color: var(--foreground-normal);
+        color: var(--theme--foreground);
       }
 
       span {
         font-size: 12px;
-        color: var(--foreground-subdued);
+        color: var(--theme--foreground-subdued);
       }
     }
   }
@@ -734,15 +734,15 @@ watch(selectedCollection, () => {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: var(--background-subdued);
-  border: 2px solid var(--border-subdued);
-  border-radius: var(--border-radius);
+  background: var(--theme--background-subdued);
+  border: 2px solid var(--theme--border-color-subdued);
+  border-radius: var(--theme--border-radius);
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: var(--background-normal);
-    border-color: var(--border-normal);
+    background: var(--theme--background-normal);
+    border-color: var(--theme--border-color);
     transform: translateX(4px);
   }
 
@@ -752,9 +752,9 @@ watch(selectedCollection, () => {
     justify-content: center;
     width: 40px;
     height: 40px;
-    background: var(--background-normal);
+    background: var(--theme--background-normal);
     border-radius: 50%;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 
   .action-content {
@@ -766,12 +766,12 @@ watch(selectedCollection, () => {
     .action-title {
       font-weight: 600;
       font-size: 14px;
-      color: var(--foreground-normal);
+      color: var(--theme--foreground);
     }
 
     .action-description {
       font-size: 12px;
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 }
@@ -781,7 +781,7 @@ watch(selectedCollection, () => {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  background: var(--background-page);
-  border-top: 1px solid var(--border-subdued);
+  background: var(--theme--background);
+  border-top: 1px solid var(--theme--border-color-subdued);
 }
 </style>
