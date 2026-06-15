@@ -92,8 +92,8 @@
               <v-icon name="link_off" />
             </v-list-item-icon>
             <v-list-item-content>
-              <div>Unassign</div>
-              <div class="list-item-subtitle">Remove from this page only</div>
+              <div>Unassign from this page</div>
+              <div class="list-item-subtitle">The item stays in its collection and on other pages</div>
             </v-list-item-content>
           </v-list-item>
 
@@ -107,8 +107,8 @@
               <v-icon name="delete" />
             </v-list-item-icon>
             <v-list-item-content>
-              <div>Delete Everywhere</div>
-              <div class="list-item-subtitle">Delete item and all references</div>
+              <div>Delete everywhere</div>
+              <div class="list-item-subtitle">Permanently delete the item and all references</div>
             </v-list-item-content>
           </v-list-item>
         </v-list>
