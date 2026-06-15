@@ -4,7 +4,7 @@
     @update:model-value="$emit('update:modelValue', $event)"
     @esc="handleCancel"
   >
-    <v-card class="delete-confirmation">
+    <v-card>
       <v-card-title class="delete-title">
         <v-icon name="remove_circle_outline" />
         <span>Remove "{{ blockTitle }}"</span>
@@ -30,6 +30,7 @@
               :disabled="loading"
               role="radio"
               :aria-checked="!deleteContent"
+              :aria-disabled="loading"
               @click="deleteContent = false"
             >
               <v-list-item-icon>
@@ -56,7 +57,7 @@
               :disabled="loading || !canDelete"
               role="radio"
               :aria-checked="deleteContent"
-              :aria-disabled="!canDelete"
+              :aria-disabled="loading || !canDelete"
               @click="canDelete && (deleteContent = true)"
             >
               <v-list-item-icon>
@@ -153,6 +154,16 @@ watch(
   () => props.modelValue,
   (isOpen) => {
     if (isOpen) deleteContent.value = false;
+  }
+);
+
+// If the user loses delete permission while "Delete everywhere" is selected
+// (e.g. a reactive permission or item change), fall back to the safe default so
+// the dialog can never emit a delete the user is no longer allowed to perform.
+watch(
+  () => props.canDelete,
+  (allowed) => {
+    if (!allowed) deleteContent.value = false;
   }
 );
 
