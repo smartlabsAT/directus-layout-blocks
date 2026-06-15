@@ -57,8 +57,17 @@
 
     <!-- Selected Area Content -->
     <div v-if="selectedArea !== undefined" class="area-content">
+      <!-- Loading Skeleton -->
+      <div v-if="loading" class="loading-skeleton">
+        <v-skeleton-loader
+          v-for="n in SKELETON_ROWS"
+          :key="n"
+          type="block-list-item"
+        />
+      </div>
+
       <!-- Blocks List -->
-      <div v-if="selectedAreaBlocks.length > 0" class="blocks-list">
+      <div v-else-if="selectedAreaBlocks.length > 0" class="blocks-list">
         <table class="blocks-table">
           <thead>
             <tr>
@@ -127,38 +136,12 @@
               </td>
               
               <td class="status-cell">
-                <v-menu
+                <status-selector
                   v-if="block.item"
-                  show-arrow
-                  placement="bottom"
-                  :close-on-content-click="true"
-                >
-                  <template #activator="{ toggle }">
-                    <div 
-                      class="status-display"
-                      :class="{ clickable: permissions.update }"
-                      @click="permissions.update && toggle()"
-                    >
-                      <span class="status-dot" :class="`status-${block.item.status || 'draft'}`" />
-                      <span class="status-text">{{ getStatusLabel(block.item.status) }}</span>
-                    </div>
-                  </template>
-                  
-                  <v-list>
-                    <v-list-item
-                      v-for="status in statusOptions"
-                      :key="status.value"
-                      clickable
-                      :active="(block.item.status || 'draft') === status.value"
-                      @click="updateBlockStatus(block, status.value)"
-                    >
-                      <v-list-item-icon>
-                        <span class="status-dot" :class="`status-${status.value}`" />
-                      </v-list-item-icon>
-                      <v-list-item-content>{{ status.text }}</v-list-item-content>
-                    </v-list-item>
-                  </v-list>
-                </v-menu>
+                  :status="block.item.status"
+                  :editable="permissions.update"
+                  @update:status="updateBlockStatus(block, $event)"
+                />
               </td>
               
               <td v-if="selectedArea === null || selectedArea === 'orphaned'" class="area-cell">
@@ -183,6 +166,7 @@
                     v-tooltip="'Edit'"
                     icon
                     x-small
+                    secondary
                     @click="$emit('update-block', { blockId: block.id })"
                   >
                     <v-icon name="edit" />
@@ -193,6 +177,7 @@
                     v-tooltip="'Duplicate'"
                     icon
                     x-small
+                    secondary
                     @click="$emit('duplicate-block', block.id)"
                   >
                     <v-icon name="content_copy" />
@@ -203,6 +188,7 @@
                     v-tooltip="'Remove'"
                     icon
                     x-small
+                    secondary
                     class="danger"
                     @click="confirmRemove(block.id)"
                   >
@@ -216,22 +202,20 @@
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state">
-        <v-icon name="inbox" large />
-        <p>No blocks in {{ selectedAreaConfig?.label }}</p>
-        <v-button
-          v-if="permissions.create && !selectedAreaConfig?.locked"
-          @click="$emit('add-block', selectedArea)"
-        >
-          Add First Block
-        </v-button>
-      </div>
+      <EmptyState
+        v-else
+        icon="inbox"
+        :message="`No blocks in ${selectedAreaConfig?.label ?? 'this area'}`"
+        :show-action="permissions.create && !selectedAreaConfig?.locked"
+        action-label="Add First Block"
+        @action="$emit('add-block', selectedArea ?? undefined)"
+      />
 
       <!-- Area Footer with Limit -->
       <div v-if="selectedAreaConfig?.maxItems" class="area-footer">
         <v-progress-linear
-          :model-value="getAreaProgress(selectedAreaConfig)"
-          :color="getAreaProgress(selectedAreaConfig) >= 100 ? 'danger' : 'primary'"
+          :value="getAreaProgress(selectedAreaConfig)"
+          :style="{ '--v-progress-linear-color': getAreaProgress(selectedAreaConfig) >= 100 ? 'var(--theme--danger)' : 'var(--theme--primary)' }"
         />
         <span>{{ selectedAreaBlocks.length }} / {{ selectedAreaConfig.maxItems }} blocks</span>
       </div>
@@ -248,6 +232,9 @@
 import { logger } from '../utils/logger';
 import { ref, computed, onMounted, watch } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
+import StatusSelector from './StatusSelector.vue';
+import EmptyState from './EmptyState.vue';
+import { createDragImage } from '../utils/blockHelpers';
 import type {
   BlockItem,
   BlockId,
@@ -288,6 +275,9 @@ const emit = defineEmits<{
 
 // Local State
 const draggedBlock = ref<BlockItem | null>(null);
+
+// Number of placeholder rows shown while blocks are loading
+const SKELETON_ROWS = 5;
 
 // Lifecycle
 onMounted(() => {
@@ -383,13 +373,6 @@ const collectionIcons: Record<string, string> = {
   content_cta: 'ads_click'
 };
 
-// Status options
-const statusOptions = [
-  { text: 'Published', value: 'published' },
-  { text: 'Draft', value: 'draft' },
-  { text: 'Archived', value: 'archived' }
-];
-
 // Methods
 function getAreaBlocks(areaId: string): BlockItem[] {
   logger.log(`🟣 ListView: Getting blocks for area '${areaId}'`);
@@ -409,15 +392,6 @@ function hasBlocks(areaId: string): boolean {
 function selectArea(areaId: string | null) {
   logger.log(`🟣 ListView: Selecting area '${areaId}'`);
   emit('update:selectedArea', areaId);
-}
-
-function getAreaTitle(): string {
-  if (props.selectedArea === null) {
-    return 'All Blocks';
-  } else if (props.selectedArea === '_orphaned') {
-    return 'Orphaned Blocks';
-  }
-  return selectedAreaConfig.value?.label || props.selectedArea || 'Unknown Area';
 }
 
 function getAreaForBlock(block: BlockItem): AreaConfig | undefined {
@@ -448,10 +422,11 @@ function getBlockTitle(block: BlockItem): string {
   const item = block.item;
   if (!item) return `Block #${block.id}`;
 
-  return item.title || 
-         item.name || 
-         item.headline || 
+  return item.title ||
+         item.name ||
+         item.headline ||
          item.label ||
+         item.heading ||
          `${getCollectionLabel(block)} #${block.id}`;
 }
 
@@ -492,11 +467,6 @@ function updateBlockStatus(block: BlockItem, newStatus: string) {
   });
 }
 
-function getStatusLabel(status?: string): string {
-  const s = statusOptions.find(opt => opt.value === (status || 'draft'));
-  return s ? s.text : 'Draft';
-}
-
 // Drag & Drop
 function handleDragStart(event: DragEvent, block: BlockItem) {
   draggedBlock.value = block;
@@ -511,50 +481,15 @@ function handleDragStart(event: DragEvent, block: BlockItem) {
     row.classList.add('dragging');
   }
   
-  // Create custom drag image
-  const dragImage = createDragImage(block);
+  // Create custom drag image (clone the dragged row's rendered icon so the glyph shows)
+  const sourceIcon = row?.querySelector('.icon-cell .v-icon') ?? null;
+  const dragImage = createDragImage(block, sourceIcon);
   event.dataTransfer!.setDragImage(dragImage, 10, 10);
   
   // Remove the drag image after a short delay
   setTimeout(() => {
     dragImage.remove();
   }, 0);
-}
-
-function createDragImage(block: BlockItem): HTMLElement {
-  const dragImage = document.createElement('div');
-  dragImage.style.cssText = `
-    position: absolute;
-    top: -1000px;
-    left: -1000px;
-    background: var(--theme--background);
-    border: 2px solid var(--theme--primary);
-    border-radius: var(--theme--border-radius);
-    padding: 12px 16px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    font-family: var(--theme--fonts--sans--font-family);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--theme--foreground);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    z-index: 9999;
-    pointer-events: none;
-  `;
-  
-  // Add icon
-  const icon = document.createElement('span');
-  icon.innerHTML = '📦';
-  dragImage.appendChild(icon);
-  
-  // Add title
-  const title = document.createElement('span');
-  title.textContent = getBlockTitle(block);
-  dragImage.appendChild(title);
-  
-  document.body.appendChild(dragImage);
-  return dragImage;
 }
 
 function handleDragEnd(event: DragEvent) {
@@ -703,54 +638,50 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   .area-tab {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 8px 10px;
-    background: var(--theme--background-normal);
-    border: 1px solid var(--theme--border-color);
-    border-radius: var(--theme--border-radius);
+    gap: 6px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--theme--foreground-subdued);
+    font: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.2s;
+    transition: color 0.2s, border-color 0.2s;
 
     &:hover {
-      background: var(--theme--background-accent);
+      color: var(--theme--foreground);
     }
 
-    /* FIXME(#47 -> #51): on-primary text has no --theme--* token. The white-on-primary
-       active tab (filled background + inverted text) is removed by the ListView redesign
-       (#51, segmented tabs with an underline indicator). Intentionally left on the legacy
-       --foreground-inverted until then; excluded from the #48 token-migration gate. */
+    /* Segmented look: active tab = primary text + a 2px underline indicator
+       (no filled background, so the legacy --foreground-inverted token is gone). */
     &.active {
-      background: var(--theme--primary);
-      color: var(--foreground-inverted);
-      border-color: var(--theme--primary);
-
-      .v-chip {
-        background: var(--theme--primary-background);
-        color: var(--foreground-inverted);
-      }
+      color: var(--theme--primary);
+      border-bottom-color: var(--theme--primary);
     }
 
     &.has-blocks:not(.active) {
       font-weight: 600;
     }
-    
+
     &.orphaned {
       .v-chip.warning {
         background: var(--theme--warning-background);
         color: var(--theme--warning);
       }
     }
-    
+
     &.drag-hover {
+      color: var(--theme--primary);
+      border-bottom-color: var(--theme--primary);
       background: var(--theme--primary-background);
-      border-color: var(--theme--primary);
     }
-    
+
     &.drag-not-allowed {
       cursor: not-allowed;
+      color: var(--theme--danger);
+      border-bottom-color: var(--theme--danger);
       background: var(--theme--danger-background);
-      border-color: var(--theme--danger);
       opacity: 0.7;
     }
   }
@@ -766,6 +697,13 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   flex-direction: column;
   overflow: hidden;
   padding-top: 16px;
+}
+
+.loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
 }
 
 
@@ -784,11 +722,11 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     thead {
       position: sticky;
       top: 0;
-      background: var(--theme--background-accent);
+      background: var(--theme--background-subdued);
       z-index: 1;
-      
+
       tr {
-        border-bottom: 2px solid var(--theme--border-color);
+        border-bottom: 1px solid var(--theme--border-color-subdued);
       }
       
       th {
@@ -797,8 +735,6 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         font-weight: 600;
         font-size: 12px;
         color: var(--theme--foreground-subdued);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
         border-right: 1px solid var(--theme--border-color-subdued);
         
         &:last-child {
@@ -828,7 +764,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
         
         &:hover {
           td {
-            background-color: var(--theme--background-accent);
+            background-color: var(--theme--background-normal);
           }
         }
         
@@ -909,50 +845,6 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     }
   }
 
-  .status-cell {
-    .status-display {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 8px;
-      border-radius: var(--theme--border-radius);
-      font-size: 13px;
-      transition: background-color 0.2s;
-      
-      &.clickable {
-        cursor: pointer;
-        
-        &:hover {
-          background-color: var(--theme--background-accent);
-        }
-      }
-      
-      .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--theme--foreground-subdued);
-        flex-shrink: 0;
-
-        &.status-published {
-          background: var(--theme--success);
-        }
-
-        &.status-draft {
-          background: var(--theme--warning);
-        }
-        
-        &.status-archived {
-          background: var(--theme--foreground-subdued);
-        }
-      }
-      
-      .status-text {
-        color: var(--theme--foreground);
-      }
-    }
-  }
-
   .actions-wrapper {
     display: flex;
     gap: 4px;
@@ -965,30 +857,23 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   }
 }
 
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  color: var(--theme--foreground-subdued);
-
-  p {
-    margin: 0;
-  }
-}
-
 .area-footer {
-  padding: 16px;
+  padding: 12px 16px;
   border-top: 1px solid var(--theme--border-color-subdued);
   display: flex;
   align-items: center;
   gap: 16px;
 
+  .v-progress-linear {
+    flex: 1;
+  }
+
   span {
-    font-size: 14px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 12px;
     color: var(--theme--foreground-subdued);
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -1002,35 +887,6 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 </style>
 
 <style lang="scss">
-// Status dropdown list styling
-.v-list {
-  .v-list-item-icon {
-    margin-right: 12px;
-    min-width: 20px;
-    display: flex;
-    align-items: center;
-    
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--theme--foreground-subdued);
-
-      &.status-published {
-        background: var(--theme--success);
-      }
-
-      &.status-draft {
-        background: var(--theme--warning);
-      }
-      
-      &.status-archived {
-        background: var(--theme--foreground-subdued);
-      }
-    }
-  }
-}
-
 // Global styles for drag state
 body.dragging-block {
   .area-tab {
@@ -1051,7 +907,6 @@ body.dragging-block {
       opacity: 0.5;
       background-color: var(--theme--primary-background) !important;
       border-color: var(--theme--primary) !important;
-      box-shadow: 0 2px 8px var(--theme--primary-background);
     }
   }
 }
