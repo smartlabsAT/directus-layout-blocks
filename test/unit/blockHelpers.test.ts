@@ -13,25 +13,33 @@ function makeBlock(overrides: Partial<BlockItem> = {}): BlockItem {
   } as BlockItem;
 }
 
+// Track every preview element we create so afterEach removes ONLY ours
+// (createDragImage appends to document.body) — never touch unrelated nodes.
+const created: HTMLElement[] = [];
+function render(block: BlockItem, icon?: Element | null): HTMLElement {
+  const el = createDragImage(block, icon);
+  created.push(el);
+  return el;
+}
+
 afterEach(() => {
-  // createDragImage appends its element to document.body — clean up between tests.
-  document.querySelectorAll('body > div').forEach(el => el.remove());
+  created.splice(0).forEach(el => el.remove());
 });
 
 describe('createDragImage', () => {
   it('appends a floating preview element to the document body and returns it', () => {
-    const el = createDragImage(makeBlock());
+    const el = render(makeBlock());
     expect(el).toBeInstanceOf(HTMLElement);
     expect(el.parentElement).toBe(document.body);
   });
 
   it('renders the block title, including the heading fallback', () => {
-    const el = createDragImage(makeBlock({ item: { heading: 'Only Heading' } }));
+    const el = render(makeBlock({ item: { heading: 'Only Heading' } }));
     expect(el.textContent).toContain('Only Heading');
   });
 
   it('renders the collection label as the meta line', () => {
-    const el = createDragImage(makeBlock());
+    const el = render(makeBlock());
     expect(el.textContent).toContain('Headline');
   });
 
@@ -39,7 +47,7 @@ describe('createDragImage', () => {
     const icon = document.createElement('span');
     icon.className = 'v-icon';
     icon.setAttribute('data-test-icon', '1');
-    const el = createDragImage(makeBlock(), icon);
+    const el = render(makeBlock(), icon);
     const cloned = el.querySelector('[data-test-icon]');
     expect(cloned).not.toBeNull();
     // It must be a clone, not the original node (which stays in its own place).
@@ -47,7 +55,7 @@ describe('createDragImage', () => {
   });
 
   it('omits the icon when no source element is given', () => {
-    const el = createDragImage(makeBlock(), null);
+    const el = render(makeBlock(), null);
     expect(el.querySelector('.v-icon')).toBeNull();
   });
 });
