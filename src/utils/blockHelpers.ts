@@ -1,4 +1,5 @@
 import type { BlockItem } from '../types';
+import { COLLECTION_META } from './constants';
 
 /**
  * Get the display title for a block
@@ -40,21 +41,17 @@ export function getCollectionLabel(collection: string): string {
 }
 
 /**
- * Get the icon for a block based on its collection
+ * Get the Material icon for a collection (by name) from the shared COLLECTION_META.
+ */
+export function getCollectionIcon(collection: string): string {
+  return COLLECTION_META[collection]?.icon ?? 'widgets';
+}
+
+/**
+ * Get the icon for a block based on its collection.
  */
 export function getBlockIcon(block: BlockItem): string {
-  const icons: Record<string, string> = {
-    content_headline: 'title',
-    content_text: 'text_fields',
-    content_image: 'image',
-    content_video: 'videocam',
-    content_hero: 'landscape',
-    content_cta: 'ads_click',
-    content_accordion: 'expand_more',
-    // Add more mappings as needed
-  };
-  
-  return icons[block.collection] || 'widgets';
+  return getCollectionIcon(block.collection);
 }
 
 /**

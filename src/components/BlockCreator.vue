@@ -1,109 +1,113 @@
 <template>
-  <div class="block-creator" data-testid="block-creator-dialog">
-    <div class="creator-header">
-      <h3>{{ headerTitle }}</h3>
-      <p>{{ headerDescription }}</p>
+  <v-card class="block-creator" data-testid="block-creator-dialog">
+    <v-card-title>Add a block</v-card-title>
+
+    <!-- Step progress (decorative — ARIA/keyboard is handled in the accessibility pass, #56) -->
+    <div class="wizard-steps">
+      <template v-for="(step, index) in steps" :key="step.n">
+        <span v-if="index > 0" class="wizard-step-line" />
+        <span
+          class="wizard-step"
+          :class="{ 'is-active': currentStep === step.n, 'is-done': currentStep > step.n }"
+        >
+          <span class="wizard-step-num">
+            <v-icon v-if="currentStep > step.n" name="check" x-small />
+            <template v-else>{{ step.n }}</template>
+          </span>
+          <span class="wizard-step-label">{{ step.label }}</span>
+        </span>
+      </template>
     </div>
 
-    <div class="creator-content">
-      <!-- Step 1: Select Area -->
+    <v-card-text>
+      <!-- Step 1: Select area -->
       <div v-if="currentStep === 1" class="creator-step">
-        <label>Select Area</label>
-        <v-select
-          :model-value="localArea"
-          @update:model-value="handleAreaSelection"
-          :items="availableAreas"
-          item-text="label"
-          item-value="id"
-          placeholder="Choose an area..."
-        >
-          <template #prepend-inner>
-            <v-icon name="dashboard_customize" />
-          </template>
-          <template #item="{ item }">
-            <div class="area-option">
-              <v-icon v-if="item.icon" :name="item.icon" small />
-              <span>{{ item.label }}</span>
-              <v-chip v-if="item.maxItems" x-small>
-                {{ getAreaBlockCount(item.id) }} / {{ item.maxItems }}
-              </v-chip>
-            </div>
-          </template>
-        </v-select>
+        <v-list class="select-list">
+          <v-list-item
+            v-for="area in availableAreas"
+            :key="area.id"
+            clickable
+            :active="localArea === area.id"
+            @click="selectAreaOption(area.id)"
+          >
+            <v-list-item-icon>
+              <v-icon :name="area.icon || 'widgets'" />
+            </v-list-item-icon>
+            <v-list-item-content>
+              <div class="item-title">{{ area.label }}</div>
+              <div class="item-subtitle">
+                {{ area.maxItems ? `Max ${area.maxItems} blocks` : 'No limit' }}
+              </div>
+            </v-list-item-content>
+            <v-list-item-icon v-if="localArea === area.id">
+              <v-icon name="check" />
+            </v-list-item-icon>
+          </v-list-item>
+        </v-list>
       </div>
 
-      <!-- Step 2: Select Collection -->
-      <div v-if="currentStep === 2" class="creator-step">
-        <label>Choose Block Type</label>
+      <!-- Step 2: Select block type -->
+      <div v-else-if="currentStep === 2" class="creator-step">
         <div class="block-type-grid">
           <div
             v-for="collection in availableCollections"
             :key="collection.value"
             class="block-type-tile"
-            :class="{ 'selected': selectedCollection === collection.value }"
-            @click="selectCollection(collection.value)"
+            :class="{ selected: selectedCollection === collection.value }"
+            @click="selectCollectionOption(collection.value)"
           >
             <div class="tile-icon">
               <v-icon :name="getCollectionIcon(collection.value)" large />
             </div>
-            <div class="tile-content">
-              <div class="tile-title">{{ collection.text }}</div>
-              <div v-if="collection.description" class="tile-description">
-                {{ collection.description }}
-              </div>
+            <div class="tile-label">{{ collection.text }}</div>
+            <div v-if="collection.description" class="tile-meta">
+              {{ collection.description }}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Step 3: Choose Action -->
-      <div v-if="currentStep === 3" class="creator-step">
-        <label>Choose Action</label>
-        <div class="action-list">
-          <div class="action-item" @click="selectAction('create')">
-            <div class="action-icon">
-              <v-icon name="add" />
-            </div>
-            <div class="action-content">
-              <div class="action-title">Create New Item</div>
-              <div class="action-description">Start with a blank item</div>
-            </div>
-            <v-icon name="chevron_right" />
-          </div>
-          
-          <div class="action-item" @click="selectAction('link')">
-            <div class="action-icon">
-              <v-icon name="link" />
-            </div>
-            <div class="action-content">
-              <div class="action-title">Link Existing Item</div>
-              <div class="action-description">Reference an existing content item</div>
-            </div>
-            <v-icon name="chevron_right" />
-          </div>
-          
-          <div class="action-item" @click="selectAction('duplicate')">
-            <div class="action-icon">
-              <v-icon name="content_copy" />
-            </div>
-            <div class="action-content">
-              <div class="action-title">Duplicate Existing Item</div>
-              <div class="action-description">Create a copy of an existing item</div>
-            </div>
-            <v-icon name="chevron_right" />
-          </div>
-        </div>
+      <!-- Step 3: Choose action -->
+      <div v-else-if="currentStep === 3" class="creator-step">
+        <v-list class="select-list">
+          <v-list-item
+            v-for="action in actionOptions"
+            :key="action.value"
+            clickable
+            :active="selectedAction === action.value"
+            @click="selectActionOption(action.value)"
+          >
+            <v-list-item-icon>
+              <v-icon :name="action.icon" />
+            </v-list-item-icon>
+            <v-list-item-content>
+              <div class="item-title">{{ action.title }}</div>
+              <div class="item-subtitle">{{ action.description }}</div>
+            </v-list-item-content>
+            <v-list-item-icon v-if="selectedAction === action.value">
+              <v-icon name="check" />
+            </v-list-item-icon>
+          </v-list-item>
+        </v-list>
       </div>
-    </div>
+    </v-card-text>
 
-    <div class="creator-footer">
-      <v-button v-if="currentStep > 1" secondary @click="goBack">
+    <v-card-actions>
+      <v-button v-if="showBack" secondary @click="goBack">
         Back
       </v-button>
+      <div class="spacer" />
       <v-button secondary @click="$emit('cancel')">
         Cancel
       </v-button>
-    </div>
+      <v-button
+        :disabled="!canContinue || creating"
+        :loading="creating"
+        @click="handleContinue"
+      >
+        {{ continueLabel }}
+      </v-button>
+    </v-card-actions>
 
     <!-- ItemSelector Drawer (Teleported to body) -->
     <Teleport to="body">
@@ -111,7 +115,7 @@
         v-if="showItemSelector"
         :open="showItemSelector"
         :collection="selectedCollection"
-        :collection-name="getCollectionLabel(selectedCollection)"
+        :collection-name="selectedCollectionLabel"
         :collection-icon="getCollectionIcon(selectedCollection)"
         :items="itemSelectorItems"
         :loading="itemSelectorLoading"
@@ -142,7 +146,7 @@
         @update:items-per-page="handleItemSelectorItemsPerPageChange"
       />
     </Teleport>
-  </div>
+  </v-card>
 </template>
 
 <script setup lang="ts">
@@ -151,6 +155,8 @@ import { ref, computed, watch } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import { useItemSelector, ItemSelectorDrawer } from 'directus-extension-expandable-blocks/shared';
 import type { AreaConfig, JunctionInfo } from '../types';
+import { COLLECTION_META } from '../utils/constants';
+import { getCollectionIcon, getCollectionLabel } from '../utils/blockHelpers';
 
 // Props
 interface Props {
@@ -180,7 +186,7 @@ const emit = defineEmits<{
     items: any[];
   }];
   cancel: [];
-}>(); 
+}>();
 
 // State
 const api = useApi();
@@ -191,8 +197,6 @@ const selectedAction = ref<'create' | 'link' | 'duplicate' | null>(null);
 // Start at step 2 if area is already selected, otherwise step 1
 const currentStep = ref(props.selectedArea ? 2 : 1);
 const showItemSelector = ref(false);
-const itemData = ref<Record<string, any>>({});
-const collectionFields = ref<any[]>([]);
 
 // ItemSelector state
 const itemSelector = useItemSelector(api, [selectedCollection.value], {
@@ -218,80 +222,20 @@ const itemSelectorAvailableLanguages = computed(() => itemSelector.availableLang
 const itemSelectorSortField = computed(() => itemSelector.sortField.value);
 const itemSelectorSortDirection = computed(() => itemSelector.sortDirection.value);
 
-// Collection metadata
-const collectionInfo: Record<string, any> = {
-  content_headline: {
-    icon: 'title',
-    label: 'Headline',
-    description: 'Title or heading text',
-    quickFields: ['headline', 'subheadline']
-  },
-  content_text: {
-    icon: 'text_fields',
-    label: 'Text Block',
-    description: 'Rich text content',
-    quickFields: ['title', 'content']
-  },
-  content_image: {
-    icon: 'image',
-    label: 'Image',
-    description: 'Image with caption',
-    quickFields: ['title', 'alt_text']
-  },
-  content_video: {
-    icon: 'videocam',
-    label: 'Video',
-    description: 'Embedded video',
-    quickFields: ['title', 'video_url']
-  },
-  content_cta: {
-    icon: 'ads_click',
-    label: 'Call to Action',
-    description: 'Button or action link',
-    quickFields: ['title', 'button_text', 'button_link']
-  },
-  content_button: {
-    icon: 'smart_button',
-    label: 'Button',
-    description: 'Simple button element',
-    quickFields: ['button_text', 'button_link']
-  },
-  content_wysiwig: {
-    icon: 'edit_note',
-    label: 'WYSIWYG Editor',
-    description: 'Visual content editor',
-    quickFields: ['content']
-  },
-  content_block: {
-    icon: 'widgets',
-    label: 'Custom Block',
-    description: 'Generic content block',
-    quickFields: ['title', 'content']
-  }
-};
+// Static wizard config
+const steps = [
+  { n: 1, label: 'Area' },
+  { n: 2, label: 'Block type' },
+  { n: 3, label: 'Action' }
+];
+
+const actionOptions = [
+  { value: 'create' as const, icon: 'add', title: 'Create new', description: 'Start with a blank item' },
+  { value: 'link' as const, icon: 'library_add', title: 'Link existing', description: 'Reference an existing content item' },
+  { value: 'duplicate' as const, icon: 'content_copy', title: 'Duplicate existing', description: 'Create a copy of an existing item' }
+];
 
 // Computed
-const headerTitle = computed(() => {
-  if (currentStep.value === 1) return 'Add New Block';
-  if (currentStep.value === 2) return 'Choose Block Type';
-  if (currentStep.value === 3) return 'Choose Action';
-  return 'Add New Block';
-});
-
-const headerDescription = computed(() => {
-  if (currentStep.value === 1) return 'Select an area for your new block';
-  if (currentStep.value === 2) {
-    // Show which area was selected when we skip step 1
-    if (props.selectedArea) {
-      const area = props.areas.find(a => a.id === props.selectedArea);
-      return `Adding to "${area?.label || props.selectedArea}" - Choose a block type`;
-    }
-    return 'Choose a block type to add';
-  }
-  if (currentStep.value === 3) return 'How would you like to add this block?';
-  return 'Choose a block type to add';
-});
-
 const availableAreas = computed(() => {
   return props.areas.filter(area => {
     if (area.locked) return false;
@@ -304,97 +248,84 @@ const availableAreas = computed(() => {
 });
 
 const availableCollections = computed(() => {
-  logger.log('🟤 BlockCreator: Computing available collections...');
-  logger.log('🟤 BlockCreator: Allowed collections prop:', props.allowedCollections);
-  logger.log('🟤 BlockCreator: Junction info:', props.junctionInfo);
-  logger.log('🟤 BlockCreator: Current area:', localArea.value);
-  
   let collections: string[] = [];
-  
-  // If allowedCollections is null, it means use ALL collections
+
   if (props.allowedCollections === null) {
-    logger.log('🟤 BlockCreator: Using all collections from junction info');
-    // Get all collections from the M2A field configuration
-    // For now, use a hardcoded list of common content collections
-    collections = [
-      'content_button',
-      'content_headline', 
-      'content_image',
-      'content_wysiwig',
-      'content_text',
-      'content_video',
-      'content_cta',
-      'content_block'
-    ];
+    // null means: use all known collections
+    collections = Object.keys(COLLECTION_META);
   } else if (Array.isArray(props.allowedCollections) && props.allowedCollections.length > 0) {
-    logger.log('🟤 BlockCreator: Using specified allowed collections:', props.allowedCollections);
     collections = props.allowedCollections;
   } else if (props.junctionInfo?.allowedCollections?.length) {
-    logger.log('🟤 BlockCreator: Using junction allowed collections:', props.junctionInfo.allowedCollections);
     collections = props.junctionInfo.allowedCollections;
   } else {
-    logger.log('🟤 BlockCreator: Using default collections from collectionInfo');
-    // Use defaults from collectionInfo
-    collections = Object.keys(collectionInfo);
+    collections = Object.keys(COLLECTION_META);
   }
-  
-  logger.log('🟤 BlockCreator: Collections before area filter:', collections);
-  
-  // Filter by area allowed types
+
+  // Filter by the selected area's allowed types
   const area = props.areas.find(a => a.id === localArea.value);
   if (area?.allowedTypes?.length) {
-    logger.log('🟤 BlockCreator: Area has allowed types:', area.allowedTypes);
     collections = collections.filter(c => area.allowedTypes!.includes(c));
   }
 
-  const result = collections.map(collection => ({
+  return collections.map(collection => ({
     value: collection,
-    text: getCollectionLabel(collection),
-    description: collectionInfo[collection]?.description
+    text: COLLECTION_META[collection]?.label ?? getCollectionLabel(collection),
+    description: COLLECTION_META[collection]?.description
   }));
-  
-  logger.log('🟤 BlockCreator: Final available collections:', result);
-  return result;
 });
 
+const selectedCollectionLabel = computed(() =>
+  COLLECTION_META[selectedCollection.value]?.label ?? getCollectionLabel(selectedCollection.value)
+);
+
+const canContinue = computed(() => {
+  if (currentStep.value === 1) return !!localArea.value;
+  if (currentStep.value === 2) return !!selectedCollection.value;
+  if (currentStep.value === 3) return !!selectedAction.value;
+  return false;
+});
+
+const continueLabel = computed(() => {
+  if (currentStep.value === 3) return selectedAction.value === 'create' ? 'Create block' : 'Continue';
+  return 'Continue';
+});
+
+// Hide "Back" on step 2 when the area was pre-selected (step 1 was skipped).
+const showBack = computed(() => currentStep.value > 1 && !(currentStep.value === 2 && !!props.selectedArea));
 
 // Methods
-function getAreaBlockCount(areaId: string): number {
-  // This would need to be passed from parent or calculated
+function getAreaBlockCount(_areaId: string): number {
+  // Block counts are not passed into the wizard; unknown counts are treated as 0.
   return 0;
 }
 
-function getCollectionIcon(collection: string): string {
-  return collectionInfo[collection]?.icon || 'widgets';
-}
-
-function getCollectionLabel(collection: string): string {
-  return collectionInfo[collection]?.label || 
-    collection.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function handleAreaSelection(areaId: string) {
-  logger.log('🟣 BlockCreator: Area selected:', areaId);
+function selectAreaOption(areaId: string) {
   localArea.value = areaId;
-  if (areaId) {
-    currentStep.value = 2;
-  }
 }
 
-function selectCollection(collection: string) {
-  logger.log('🟣 BlockCreator: Collection selected:', collection);
+function selectCollectionOption(collection: string) {
   selectedCollection.value = collection;
-  currentStep.value = 3;
 }
 
-function selectAction(action: 'create' | 'link' | 'duplicate') {
-  logger.log('🟣 BlockCreator: Action selected:', action);
+function selectActionOption(action: 'create' | 'link' | 'duplicate') {
   selectedAction.value = action;
-  
-  if (action === 'create') {
+}
+
+// Single advance dispatcher — selection only marks; "Continue" advances / triggers.
+function handleContinue() {
+  if (creating.value) return;
+  if (currentStep.value === 1) {
+    currentStep.value = 2;
+    return;
+  }
+  if (currentStep.value === 2) {
+    currentStep.value = 3;
+    return;
+  }
+  // Step 3: run the chosen action
+  if (selectedAction.value === 'create') {
     createNewItem();
-  } else {
-    // Open ItemSelector for link or duplicate
+  } else if (selectedAction.value) {
     showItemSelector.value = true;
     itemSelector.open(selectedCollection.value);
   }
@@ -402,18 +333,13 @@ function selectAction(action: 'create' | 'link' | 'duplicate') {
 
 function goBack() {
   if (currentStep.value === 3) {
+    selectedAction.value = null;
     currentStep.value = 2;
+  } else if (currentStep.value === 2) {
     selectedCollection.value = '';
     selectedAction.value = null;
-  } else if (currentStep.value === 2) {
-    // If area was pre-selected, don't go back to step 1
-    if (props.selectedArea) {
-      // Just close the dialog
-      emit('cancel');
-    } else {
-      currentStep.value = 1;
-      localArea.value = '';
-    }
+    currentStep.value = 1;
+    localArea.value = '';
   }
 }
 
@@ -423,15 +349,13 @@ function closeItemSelector() {
 }
 
 function handleItemsLinked(items: any[]) {
-  logger.log('🟣 BlockCreator: Linking items:', items);
-  
   if (items.length > 0) {
     emit('link', {
       area: localArea.value,
       collection: selectedCollection.value,
       items: items
     });
-    
+
     // Close both ItemSelector and BlockCreator
     closeItemSelector();
     emit('cancel');
@@ -441,15 +365,13 @@ function handleItemsLinked(items: any[]) {
 }
 
 function handleItemsDuplicated(items: any[]) {
-  logger.log('🟣 BlockCreator: Duplicating items:', items);
-  
   if (items.length > 0) {
     emit('duplicate', {
       area: localArea.value,
       collection: selectedCollection.value,
       items: items
     });
-    
+
     // Close both ItemSelector and BlockCreator
     closeItemSelector();
     emit('cancel');
@@ -488,41 +410,22 @@ function isFieldTranslatable(field: string): boolean {
 }
 
 async function createNewItem() {
-  logger.log('🟣 BlockCreator: Creating new item');
-  
   if (!localArea.value || !selectedCollection.value) {
-    logger.error('🔴 BlockCreator: Missing area or collection');
+    logger.error('BlockCreator: Missing area or collection');
     return;
   }
 
   creating.value = true;
 
   try {
-    // Create empty item with just status
-    const newItem = {
-      status: 'draft'
-    };
-    
-    // Add default values based on collection type
-    const info = collectionInfo[selectedCollection.value];
-    if (info?.quickFields) {
-      // Add empty default values for required fields
-      if (info.quickFields.includes('title')) {
-        newItem.title = 'New ' + info.label;
-      }
-      if (info.quickFields.includes('headline')) {
-        newItem.headline = 'New ' + info.label;
-      }
-      if (info.quickFields.includes('content')) {
-        newItem.content = '';
-      }
+    // Create an empty item with just the default status + collection-specific title fields
+    const newItem: Record<string, unknown> = { status: 'draft' };
+    const meta = COLLECTION_META[selectedCollection.value];
+    if (meta?.quickFields) {
+      if (meta.quickFields.includes('title')) newItem.title = 'New ' + meta.label;
+      if (meta.quickFields.includes('headline')) newItem.headline = 'New ' + meta.label;
+      if (meta.quickFields.includes('content')) newItem.content = '';
     }
-
-    logger.log('🟣 BlockCreator: Creating block with data:', {
-      area: localArea.value,
-      collection: selectedCollection.value,
-      item: newItem
-    });
 
     emit('create', {
       area: localArea.value,
@@ -530,258 +433,152 @@ async function createNewItem() {
       item: newItem
     });
 
+    // Reaching here means the parent did NOT unmount us — i.e. validation/save failed and the
+    // dialog stayed open. Clear the loading state so the wizard doesn't get stuck on the spinner.
+    // On success the parent closes the dialog (v-if), unmounting this component before this runs.
+    creating.value = false;
   } catch (error) {
-    logger.error('🔴 BlockCreator: Failed to create block:', error);
+    logger.error('BlockCreator: Failed to create block', error);
     creating.value = false;
   }
 }
 
-// Watch for area changes
+// Keep localArea in sync if the parent changes the pre-selected area while the wizard is open.
+// Step advance is driven solely by handleContinue — no currentStep changes here.
 watch(() => props.selectedArea, (newArea) => {
-  if (newArea) {
-    localArea.value = newArea;
-    // Don't change step if already past step 2
-    if (currentStep.value === 1) {
-      currentStep.value = 2;
-    }
-  }
-});
-
-// Watch for area selection to advance step
-watch(localArea, (newArea) => {
-  if (newArea && currentStep.value === 1) {
-    currentStep.value = 2;
-  }
-});
-
-// Reset form when collection changes
-watch(selectedCollection, () => {
-  itemData.value = {};
+  if (newArea) localArea.value = newArea;
 });
 </script>
 
 <style lang="scss" scoped>
+@use '../styles/theme' as theme;
+
+/* Widen the dialog: v-dialog has no width prop and the inner v-card defaults to
+   --v-card-min-width: 540px (set on the card itself, so it cannot be inherited from a
+   wrapper — the card is teleported out of the dialog element). Override it directly on the
+   card root (this component IS the v-card). min() keeps it responsive on narrow viewports. */
 .block-creator {
-  width: 700px;
-  max-width: 90vw;
-  background: white;
-  border-radius: var(--theme--border-radius);
-  overflow: hidden;
+  --v-card-min-width: min(720px, calc(100vw - 40px)) !important;
 }
 
-.creator-header {
-  text-align: center;
-  margin-bottom: 24px;
-  padding: 24px 24px 0;
-
-  h3 {
-    margin: 0 0 8px;
-    font-size: 20px;
-    font-weight: 600;
-  }
-
-  p {
-    margin: 0;
-    color: var(--theme--foreground-subdued);
-  }
-}
-
-.creator-content {
+.wizard-steps {
   display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 0 24px 24px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--theme--foreground-subdued);
+
+  &.is-active {
+    color: var(--theme--primary);
+  }
+}
+
+.wizard-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--theme--background-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+
+  /* #fff on the primary/success fill is the documented --foreground-inverted exception
+     (AA verified, TOKENS §7). #57-allow: white-on-primary / white-on-success step marker. */
+  .wizard-step.is-active & {
+    background: var(--theme--primary);
+    color: #fff;
+  }
+
+  .wizard-step.is-done & {
+    background: var(--theme--success);
+    color: #fff;
+  }
+}
+
+.wizard-step-line {
+  width: 18px;
+  height: 1px;
+  background: var(--theme--border-color-accent);
 }
 
 .creator-step {
-  label {
-    display: block;
-    margin-bottom: 8px;
+  .item-title {
     font-weight: 600;
+    color: var(--theme--foreground);
+  }
+
+  .item-subtitle {
+    font-size: 12px;
     color: var(--theme--foreground-subdued);
-    font-size: 14px;
+    margin-top: 2px;
   }
 }
 
-.area-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+.select-list {
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .block-type-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 8px;
 }
 
 .block-type-tile {
+  @include theme.card-surface;
+  @include theme.interactive-states;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 16px;
-  background: var(--theme--background-subdued);
-  border: 2px solid var(--theme--border-color-subdued);
-  border-radius: var(--theme--border-radius);
-  cursor: pointer;
-  transition: all 0.2s;
+  gap: 10px;
+  padding: 18px 12px;
   text-align: center;
-  min-height: 140px;
-
-  &:hover {
-    background: var(--theme--background-normal);
-    border-color: var(--theme--border-color);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  &.selected {
-    background: var(--theme--primary-background);
-    border-color: var(--theme--primary);
-    
-    .tile-icon {
-      color: var(--theme--primary);
-    }
-  }
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 
   .tile-icon {
-    margin-bottom: 12px;
-    color: var(--theme--foreground-subdued);
-    transition: color 0.2s;
-  }
-
-  .tile-content {
+    width: 46px;
+    height: 46px;
+    border-radius: var(--theme--border-radius);
+    background: var(--theme--background-normal);
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    justify-content: center;
+    color: var(--theme--foreground);
+    transition: background 0.12s, color 0.12s;
   }
 
-  .tile-title {
+  /* interactive-states only themes the container; the icon fill is set here. */
+  &.selected .tile-icon {
+    /* #57-allow: white-on-primary selected tile icon (foreground-inverted, AA). */
+    background: var(--theme--primary);
+    color: #fff;
+  }
+
+  .tile-label {
     font-weight: 600;
     font-size: 14px;
-    color: var(--theme--foreground);
+    color: var(--theme--foreground-accent);
   }
 
-  .tile-description {
+  .tile-meta {
     font-size: 12px;
     color: var(--theme--foreground-subdued);
     line-height: 1.4;
   }
 }
 
-.quick-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.field-group {
-  label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 14px;
-    font-weight: 500;
-  }
-}
-
-.creator-preview {
-  label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--theme--foreground-subdued);
-    font-size: 14px;
-  }
-
-  .preview-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: var(--theme--background-subdued);
-    border: 1px solid var(--theme--border-color);
-    border-radius: var(--theme--border-radius);
-
-    .preview-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-
-      strong {
-        color: var(--theme--foreground);
-      }
-
-      span {
-        font-size: 12px;
-        color: var(--theme--foreground-subdued);
-      }
-    }
-  }
-}
-
-.action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.action-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: var(--theme--background-subdued);
-  border: 2px solid var(--theme--border-color-subdued);
-  border-radius: var(--theme--border-radius);
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: var(--theme--background-normal);
-    border-color: var(--theme--border-color);
-    transform: translateX(4px);
-  }
-
-  .action-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: var(--theme--background-normal);
-    border-radius: 50%;
-    color: var(--theme--foreground-subdued);
-  }
-
-  .action-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-
-    .action-title {
-      font-weight: 600;
-      font-size: 14px;
-      color: var(--theme--foreground);
-    }
-
-    .action-description {
-      font-size: 12px;
-      color: var(--theme--foreground-subdued);
-    }
-  }
-}
-
-.creator-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  background: var(--theme--background);
-  border-top: 1px solid var(--theme--border-color-subdued);
+.spacer {
+  flex: 1;
 }
 </style>
