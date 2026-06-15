@@ -25,9 +25,7 @@
           <v-list-item-icon>
             <v-icon :name="collection.icon || 'widgets'" />
           </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-text>{{ collection.label }}</v-list-item-text>
-          </v-list-item-content>
+          <v-list-item-content>{{ collection.label }}</v-list-item-content>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -57,9 +55,7 @@
           <v-list-item-icon>
             <v-icon :name="collection.icon || 'widgets'" />
           </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-text>{{ collection.label }}</v-list-item-text>
-          </v-list-item-content>
+          <v-list-item-content>{{ collection.label }}</v-list-item-content>
         </v-list-item>
       </v-list>
     </v-menu>
@@ -69,6 +65,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { logger } from '../utils/logger';
+import { COLLECTION_META } from '../utils/constants';
+import { getCollectionLabel, getCollectionIcon } from '../utils/blockHelpers';
 
 interface Props {
   area: string;
@@ -87,69 +85,16 @@ const emit = defineEmits<{
   'open-selector': [data: { area: string; collection: string }];
 }>();
 
-// Collection metadata
-const collectionInfo: Record<string, any> = {
-  content_headline: {
-    icon: 'title',
-    label: 'Headline',
-    description: 'Title or heading text'
-  },
-  content_text: {
-    icon: 'text_fields',
-    label: 'Text Block',
-    description: 'Rich text content'
-  },
-  content_image: {
-    icon: 'image',
-    label: 'Image',
-    description: 'Image with caption'
-  },
-  content_video: {
-    icon: 'videocam',
-    label: 'Video',
-    description: 'Embedded video'
-  },
-  content_cta: {
-    icon: 'ads_click',
-    label: 'Call to Action',
-    description: 'Button or action link'
-  },
-  content_button: {
-    icon: 'smart_button',
-    label: 'Button',
-    description: 'Simple button element'
-  },
-  content_wysiwig: {
-    icon: 'edit_note',
-    label: 'Rich Text',
-    description: 'WYSIWYG editor content'
-  },
-  content_block: {
-    icon: 'widgets',
-    label: 'Generic Block',
-    description: 'Flexible content block'
-  }
-};
-
 const availableCollections = computed(() => {
-  let collections: string[] = [];
-  
-  if (props.allowedCollections === null) {
-    // Use all collections
-    collections = Object.keys(collectionInfo);
-  } else if (Array.isArray(props.allowedCollections) && props.allowedCollections.length > 0) {
-    collections = props.allowedCollections;
-  } else {
-    // Default collections
-    collections = Object.keys(collectionInfo);
-  }
-  
+  const collections = Array.isArray(props.allowedCollections) && props.allowedCollections.length > 0
+    ? props.allowedCollections
+    : Object.keys(COLLECTION_META);
+
   return collections.map(collection => ({
     value: collection,
-    label: collectionInfo[collection]?.label || 
-      collection.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    icon: collectionInfo[collection]?.icon || 'widgets',
-    description: collectionInfo[collection]?.description
+    label: COLLECTION_META[collection]?.label ?? getCollectionLabel(collection),
+    icon: getCollectionIcon(collection),
+    description: COLLECTION_META[collection]?.description
   }));
 });
 
@@ -173,6 +118,6 @@ function handleOpenSelector(collection: string) {
 <style lang="scss" scoped>
 .add-block-dropdown {
   display: inline-flex;
-  gap: 4px;
+  gap: 0.25rem;
 }
 </style>

@@ -64,8 +64,10 @@ export function useBlockPermissions(
         return false;
       }
 
-      // Admin users have all permissions
-      if (currentUser.role?.admin_access === true) {
+      // Admin users have all permissions. Directus 11 moved admin_access from roles to
+      // policies and exposes it as a top-level flag on currentUser; check that first and
+      // keep the legacy role.admin_access as a Directus 10 fallback.
+      if (currentUser.admin_access === true || currentUser.role?.admin_access === true) {
         return true;
       }
 
