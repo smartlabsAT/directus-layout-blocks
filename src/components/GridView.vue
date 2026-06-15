@@ -86,8 +86,8 @@
         <!-- Area Footer -->
         <div v-if="area.maxItems" class="area-footer">
           <v-progress-linear
-            :model-value="getAreaProgress(area)"
-            :color="getAreaProgress(area) >= 100 ? 'danger' : 'primary'"
+            :value="getAreaProgress(area)"
+            :style="{ '--v-progress-linear-color': getAreaProgress(area) >= 100 ? 'var(--theme--danger)' : 'var(--theme--primary)' }"
             rounded
           />
           <span class="area-limit">
@@ -112,6 +112,7 @@ import type {
   UserPermissions
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
+import { createDragImage } from '../utils/blockHelpers';
 
 // Props
 interface Props {
@@ -259,93 +260,17 @@ function handleDragStart(event: DragEvent, block: BlockItem, area: AreaConfig) {
   // Add dragging class to body for global styles
   document.body.classList.add('dragging-block');
   
-  // Create custom drag image
-  const dragImage = createDragImage(block);
+  // Create custom drag image (clone the rendered collection icon so the glyph shows)
+  const sourceIcon = document.querySelector(
+    `.block-item[data-block-id=${CSS.escape(String(block.id))}] .block-icon .v-icon`
+  );
+  const dragImage = createDragImage(block, sourceIcon);
   event.dataTransfer!.setDragImage(dragImage, 10, 10);
   
   // Remove the drag image after a short delay
   setTimeout(() => {
     dragImage.remove();
   }, 0);
-}
-
-function createDragImage(block: BlockItem): HTMLElement {
-  const dragImage = document.createElement('div');
-  dragImage.style.cssText = `
-    position: absolute;
-    top: -1000px;
-    left: -1000px;
-    background: var(--theme--background);
-    border: var(--theme--border-width) solid var(--theme--primary);
-    border-radius: var(--theme--border-radius);
-    padding: 16px;
-    box-shadow: var(--theme--popover--menu--box-shadow);
-    font-family: var(--theme--fonts--sans--font-family);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-    z-index: 9999;
-    pointer-events: none;
-  `;
-  
-  // Add header with icon
-  const header = document.createElement('div');
-  header.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--theme--foreground);
-  `;
-  
-  // Real collection icon (no emoji): clone the dragged block's already-rendered
-  // icon node. The Material Symbols font is applied via the v-icon component's
-  // SCOPED styles (its data-v attribute), so a hand-built node would render no
-  // glyph — the clone carries that scope attribute and renders correctly.
-  const sourceIcon = document.querySelector(
-    `.block-item[data-block-id=${CSS.escape(String(block.id))}] .block-icon .v-icon`
-  );
-  if (sourceIcon) {
-    header.appendChild(sourceIcon.cloneNode(true));
-  }
-  
-  const title = document.createElement('span');
-  title.textContent = getBlockTitle(block);
-  header.appendChild(title);
-  
-  dragImage.appendChild(header);
-  
-  // Add collection type
-  const meta = document.createElement('div');
-  meta.style.cssText = `
-    font-size: 12px;
-    color: var(--theme--foreground-subdued);
-  `;
-  meta.textContent = getCollectionLabel(block);
-  dragImage.appendChild(meta);
-  
-  document.body.appendChild(dragImage);
-  return dragImage;
-}
-
-function getBlockTitle(block: BlockItem): string {
-  const item = block.item;
-  if (!item) return `Block #${block.id}`;
-
-  return item.title || 
-         item.name || 
-         item.headline || 
-         item.label ||
-         `${getCollectionLabel(block)} #${block.id}`;
-}
-
-function getCollectionLabel(block: BlockItem): string {
-  return block.collection
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase())
-    .replace(/^Content /, '');
 }
 
 function handleDragEnd(event: DragEvent) {
@@ -652,9 +577,16 @@ function handleAddBlock(areaId: string) {
   background: var(--theme--background-normal);
   border-radius: 0 0 var(--theme--border-radius) var(--theme--border-radius);
 
+  .v-progress-linear {
+    flex: 1;
+  }
+
   .area-limit {
+    flex-shrink: 0;
+    white-space: nowrap;
     font-size: 12px;
     color: var(--theme--foreground-subdued);
+    font-variant-numeric: tabular-nums;
   }
 }
 

@@ -71,19 +71,31 @@ export function getStatusLabel(status?: string): string {
 }
 
 /**
- * Create a drag image element for block dragging
+ * Create a floating drag-image element for block dragging.
+ *
+ * Shared by GridView and ListView (issue #51). The Material Symbols glyph is
+ * applied via the v-icon component's SCOPED styles (its data-v attribute), so a
+ * hand-built icon node would render no glyph — callers therefore pass their
+ * already-rendered `.v-icon` node and we clone it. The element must be appended
+ * to document.body BEFORE the caller calls `setDragImage()` so the `--theme--*`
+ * custom properties resolve (a detached node has none); the caller removes it on
+ * the next tick.
+ *
+ * @param sourceIconEl the block's already-rendered v-icon node to clone. Each view
+ *   queries its own DOM — Grid: `.block-item[data-block-id] .block-icon .v-icon`,
+ *   List: the dragged row's `.icon-cell .v-icon`. When absent, no icon is shown.
  */
-export function createDragImage(block: BlockItem): HTMLElement {
+export function createDragImage(block: BlockItem, sourceIconEl?: Element | null): HTMLElement {
   const dragImage = document.createElement('div');
   dragImage.style.cssText = `
     position: absolute;
     top: -1000px;
     left: -1000px;
     background: var(--theme--background);
-    border: 2px solid var(--theme--primary);
+    border: var(--theme--border-width) solid var(--theme--primary);
     border-radius: var(--theme--border-radius);
     padding: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--theme--popover--menu--box-shadow);
     font-family: var(--theme--fonts--sans--font-family);
     display: flex;
     flex-direction: column;
@@ -92,8 +104,8 @@ export function createDragImage(block: BlockItem): HTMLElement {
     z-index: 9999;
     pointer-events: none;
   `;
-  
-  // Add header with icon
+
+  // Header: real collection icon (cloned from the rendered v-icon) + title.
   const header = document.createElement('div');
   header.style.cssText = `
     display: flex;
@@ -103,18 +115,18 @@ export function createDragImage(block: BlockItem): HTMLElement {
     font-size: 14px;
     color: var(--theme--foreground);
   `;
-  
-  const icon = document.createElement('span');
-  icon.innerHTML = '📦';
-  header.appendChild(icon);
-  
+
+  if (sourceIconEl) {
+    header.appendChild(sourceIconEl.cloneNode(true));
+  }
+
   const title = document.createElement('span');
   title.textContent = getBlockTitle(block);
   header.appendChild(title);
-  
+
   dragImage.appendChild(header);
-  
-  // Add collection type
+
+  // Collection type meta line.
   const meta = document.createElement('div');
   meta.style.cssText = `
     font-size: 12px;
@@ -122,7 +134,7 @@ export function createDragImage(block: BlockItem): HTMLElement {
   `;
   meta.textContent = getCollectionLabel(block.collection);
   dragImage.appendChild(meta);
-  
+
   document.body.appendChild(dragImage);
   return dragImage;
 }
