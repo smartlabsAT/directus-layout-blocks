@@ -4,10 +4,13 @@
     :class="{
       'compact': compact,
       'draggable': draggable,
-      'selected': isSelected
+      'dragging': grabbed
     }"
     :data-block-id="block.id"
     :draggable="draggable"
+    role="listitem"
+    tabindex="0"
+    :aria-roledescription="draggable ? 'sortable' : undefined"
     v-bind="$attrs"
     @click.stop="handleClick"
     @dblclick="handleDoubleClick"
@@ -46,9 +49,10 @@
         show-arrow
         placement="bottom-end"
       >
-        <template #activator="{ toggle }">
+        <template #activator="{ toggle, active }">
           <v-button
             v-tooltip="'Options'"
+            v-btn-aria="{ 'aria-label': 'Block options', 'aria-haspopup': 'menu', 'aria-expanded': active }"
             icon
             x-small
             secondary
@@ -129,6 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
 import StatusSelector from './StatusSelector.vue';
@@ -148,13 +153,14 @@ interface Props {
   compact?: boolean;
   permissions: UserPermissions;
   draggable?: boolean;
-  selected?: boolean;
+  /** True while this block is held in keyboard drag mode (a11y §3). */
+  grabbed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   compact: false,
   draggable: true,
-  selected: false
+  grabbed: false
 });
 
 // Emits
@@ -169,7 +175,6 @@ const emit = defineEmits<{
 }>();
 
 // State
-const isSelected = ref(props.selected);
 const showDeleteDialog = ref(false);
 const deleteLoading = ref(false);
 
@@ -192,7 +197,6 @@ function getBlockColor(): string {
 }
 
 function handleClick() {
-  isSelected.value = !isSelected.value;
   emit('click');
 }
 
@@ -251,9 +255,10 @@ function updateStatus(status: string) {
     background: var(--theme--background-normal);
   }
 
-  &.selected {
-    border-color: var(--theme--primary);
-    background: var(--theme--primary-background);
+  /* Keyboard focus ring (a11y §1) — keyboard-only via :focus-visible. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--primary);
+    outline-offset: 2px;
   }
 
   &.draggable {
@@ -348,5 +353,12 @@ function updateStatus(status: string) {
   font-size: 12px;
   color: var(--theme--foreground-subdued);
   margin-top: 2px;
+}
+
+/* Reduced motion (a11y §5): no card transitions when the user opts out. */
+@media (prefers-reduced-motion: reduce) {
+  .block-item {
+    transition: none;
+  }
 }
 </style>

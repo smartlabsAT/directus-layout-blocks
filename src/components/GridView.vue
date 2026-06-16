@@ -13,7 +13,12 @@
           'drag-over': dragOverArea === area.id
         }"
         :style="getAreaStyle(area)"
+        role="group"
+        :aria-label="area.label"
+        tabindex="0"
         @click="selectArea(area.id)"
+        @keydown.self.enter.prevent.stop="selectArea(area.id)"
+        @keydown.self.space.prevent.stop="selectArea(area.id)"
         @dragover="handleDragOver($event, area)"
         @drop="handleDrop($event, area)"
         @dragleave="handleDragLeave"
@@ -56,6 +61,7 @@
             name="block-list"
             tag="div"
             class="blocks-container"
+            role="list"
           >
             <block-item-component
               v-for="(block, index) in getAreaBlocks(area.id)"
@@ -66,6 +72,7 @@
               :compact="options.compactMode"
               :permissions="permissions"
               :draggable="options.enableDragDrop && (!area.locked || area.id === 'orphaned')"
+              :grabbed="isBlockGrabbed(block.id)"
               @edit="$emit('update-block', { blockId: block.id })"
               @remove="$emit('remove-block', block.id)"
               @unlink="$emit('unlink-block', block.id)"
@@ -74,6 +81,7 @@
               @update-status="handleBlockStatusUpdate(block, $event)"
               @dragstart="handleDragStart($event, block, area)"
               @dragend="handleDragEnd"
+              @keydown="handleBlockKeydown($event, block)"
             />
           </transition-group>
 
@@ -107,12 +115,14 @@
       </div>
     </div>
 
+    <!-- Visually-hidden live region: announces keyboard drag & drop steps. -->
+    <div class="lb-sr-only" role="status" aria-live="polite">{{ kbAnnouncement }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { logger } from '../utils/logger';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import type {
   BlockItem,
@@ -122,7 +132,8 @@ import type {
   UserPermissions
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
-import { createDragImage } from '../utils/blockHelpers';
+import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
+import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 
 // Props
 interface Props {
@@ -191,9 +202,48 @@ const visibleAreas = computed(() => {
     return props.areas;
   }
   
-  return props.areas.filter(area => 
+  return props.areas.filter(area =>
     hasBlocks(area.id) || area.id === props.selectedArea
   );
+});
+
+// Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3) — the focused block card itself
+// is the grab target (no separate handle in the grid). Reuses the very same
+// canDropInArea predicate as the pointer path so the rules stay identical.
+/* Just past the .block-list leave/move transition (0.3s, see <style>). After a
+   cross-area move the LEAVING card lingers in its old area's transition-group
+   for that long and steals focus back to <body> when it is finally removed — so
+   besides the immediate attempt we re-assert focus once the transition settled. */
+const FOCUS_SETTLE_MS = 380;
+
+function focusBlock(blockId: BlockId): void {
+  /* During the leave/enter transition there can briefly be TWO [data-block-id]
+     nodes (leaving ghost + entering card). Focus the one that is NOT leaving. */
+  const focusNonLeaving = () => {
+    const nodes = rootEl.value?.querySelectorAll(`[data-block-id="${CSS.escape(String(blockId))}"]`);
+    const el = nodes && (Array.from(nodes).find((n) =>
+      !n.classList.contains('block-list-leave-active') &&
+      !n.classList.contains('block-list-leave-to')
+    ) as HTMLElement | undefined);
+    el?.focus();
+  };
+  nextTick(focusNonLeaving);          /* fast path (within-area moves) */
+  setTimeout(focusNonLeaving, FOCUS_SETTLE_MS);  /* re-assert after the transition settles */
+}
+
+const {
+  announcement: kbAnnouncement,
+  isGrabbed: isBlockGrabbed,
+  handleBlockKeydown,
+} = useKeyboardDnd({
+  areas: visibleAreas,
+  getAreaBlocks,
+  canDrop: canDropInArea,
+  emitMove: (payload) => emit('move-block', payload),
+  enabled: () => !!props.options.enableDragDrop,
+  getTitle: (block) => getBlockTitle(block),
+  focusBlock,
+  navOrder: () => visibleAreas.value.flatMap((a) => getAreaBlocks(a.id).map((b) => b.id)),
 });
 
 // Methods
@@ -427,7 +477,14 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   if (area.id === 'orphaned') {
     return false;
   }
-  
+
+  // Locked areas are not valid drop targets. ListView already enforced this;
+  // GridView's pointer handlers checked it separately, but folding it in here
+  // keeps a single source of truth that the keyboard DnD engine reuses too.
+  if (area.locked) {
+    return false;
+  }
+
   // Check max items
   if (area.maxItems) {
     const currentCount = getAreaBlocks(area.id).length;
@@ -512,6 +569,12 @@ function handleAddBlock(areaId: string) {
 
   &:hover {
     border-color: var(--theme--border-color-accent);
+  }
+
+  /* Keyboard focus ring (a11y §1) — keyboard-only via :focus-visible. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--primary);
+    outline-offset: 2px;
   }
 
   &.selected {
@@ -675,5 +738,38 @@ function handleAddBlock(areaId: string) {
 
 :deep(.sortable-drag) {
   opacity: 0;
+}
+
+/* Visually-hidden live region (a11y §3): off-screen but readable by AT. */
+.lb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion (a11y §5): drop entrance/move/drag animations; keep function. */
+@media (prefers-reduced-motion: reduce) {
+  .grid-area {
+    transition: none;
+  }
+
+  .block-list-move,
+  .block-list-enter-active,
+  .block-list-leave-active,
+  .slide-enter-active,
+  .slide-leave-active {
+    transition: none;
+  }
+
+  .block-list-enter-from,
+  .block-list-leave-to {
+    transform: none;
+  }
 }
 </style>

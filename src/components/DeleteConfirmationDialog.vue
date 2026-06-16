@@ -22,7 +22,7 @@
             Full radiogroup/focus-trap/focus-ring a11y is owned by #56; here we
             only provide the static role / aria-checked / aria-disabled structure.
           -->
-          <v-list class="choice-list">
+          <v-list class="choice-list" role="radiogroup" aria-label="How to remove this block">
             <v-list-item
               clickable
               class="lb-choice"

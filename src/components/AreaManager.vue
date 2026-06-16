@@ -39,8 +39,13 @@
 
                   <td class="icon-cell">
                     <v-menu v-if="!area.locked" show-arrow placement="bottom">
-                      <template #activator="{ toggle }">
-                        <v-button icon x-small @click="toggle">
+                      <template #activator="{ toggle, active }">
+                        <v-button
+                          icon
+                          x-small
+                          v-btn-aria="{ 'aria-label': 'Choose area icon', 'aria-haspopup': 'menu', 'aria-expanded': active }"
+                          @click="toggle"
+                        >
                           <v-icon :name="area.icon || 'dashboard_customize'" />
                         </v-button>
                       </template>
@@ -219,10 +224,11 @@
                         show-arrow
                         placement="bottom-start"
                       >
-                        <template #activator="{ toggle }">
+                        <template #activator="{ toggle, active }">
                           <v-button
                             x-small
                             icon
+                            v-btn-aria="{ 'aria-label': 'Add allowed collection', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                             @click="toggle"
                           >
                             <v-icon name="add" />
@@ -246,6 +252,7 @@
                     <v-button
                       v-if="!area.locked"
                       v-tooltip="'Remove area'"
+                      v-btn-aria="{ 'aria-label': 'Remove area' }"
                       icon
                       x-small
                       secondary
@@ -288,6 +295,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
 import type { AreaConfig } from '../types';
@@ -733,7 +741,7 @@ defineExpose({
   }
 
   &:not(.locked):focus-visible {
-    outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+    outline: 2px solid var(--theme--primary);
     outline-offset: 2px;
   }
 

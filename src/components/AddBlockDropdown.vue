@@ -1,9 +1,10 @@
 <template>
   <div class="add-block-dropdown">
     <v-menu placement="bottom-start" show-arrow>
-      <template #activator="{ toggle }">
+      <template #activator="{ toggle, active }">
         <v-button
           v-tooltip="'Create new block'"
+          v-btn-aria="{ 'aria-label': 'Create new block', 'aria-haspopup': 'menu', 'aria-expanded': active }"
           icon
           :small="size === 'small'"
           :x-small="size === 'x-small'"
@@ -31,9 +32,10 @@
     </v-menu>
 
     <v-menu placement="bottom-start" show-arrow>
-      <template #activator="{ toggle }">
+      <template #activator="{ toggle, active }">
         <v-button
           v-tooltip="'Link or duplicate existing'"
+          v-btn-aria="{ 'aria-label': 'Link or duplicate existing', 'aria-haspopup': 'menu', 'aria-expanded': active }"
           icon
           :small="size === 'small'"
           :x-small="size === 'x-small'"
@@ -64,6 +66,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import { logger } from '../utils/logger';
 import { COLLECTION_META } from '../utils/constants';
 import { getCollectionLabel, getCollectionIcon } from '../utils/blockHelpers';
