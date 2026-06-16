@@ -128,7 +128,7 @@
         </div>
 
         <div class="toolbar-right">
-          <v-button-group role="radiogroup" aria-label="View mode">
+          <div class="lb-view-toggle" role="radiogroup" aria-label="View mode">
             <v-button
               v-tooltip="'Grid view'"
               v-btn-aria="{ role: 'radio', 'aria-label': 'Grid view', 'aria-checked': viewMode === 'grid', tabindex: viewMode === 'grid' ? 0 : -1, 'data-view': 'grid' }"
@@ -153,7 +153,7 @@
             >
               <v-icon name="view_list" />
             </v-button>
-          </v-button-group>
+          </div>
         </div>
       </div>
 
@@ -1905,6 +1905,15 @@ watch(() => props.value, () => {
   .toolbar-center {
     flex: 1;
     justify-content: center;
+  }
+
+  /* View-mode toggle (Grid/List): replaces the bare <v-button-group> element,
+     which is not a registered Directus component (it rendered as an unstyled
+     literal element, so the two icon buttons sat edge-to-edge with no gap). */
+  .lb-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 
   /* Area selector trigger (v-menu activator): a native v-button showing the
