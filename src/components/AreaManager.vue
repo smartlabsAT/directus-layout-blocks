@@ -2,14 +2,6 @@
   <div class="area-manager">
     <div class="manager-content">
       <div class="area-section">
-        <div class="section-header">
-          <h4>Areas</h4>
-          <v-button small @click="addArea">
-            <v-icon name="add" small left />
-            Add Area
-          </v-button>
-        </div>
-
         <div v-if="localAreas.length > 0" class="areas-table-wrapper">
           <table class="areas-table">
             <thead>
@@ -277,7 +269,8 @@
         </div>
 
         <div v-else class="empty-state">
-          <p>No areas defined</p>
+          <v-icon name="dashboard_customize" large />
+          <p>No areas defined yet — use "Add area" to create one.</p>
         </div>
 
         <!--
@@ -604,7 +597,8 @@ const IconPicker = {
 // Expose for parent
 defineExpose({
   save,
-  hasErrors
+  hasErrors,
+  addArea
 });
 </script>
 
@@ -622,21 +616,6 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 32px;
-}
-
-.area-section {
-  h4 {
-    margin: 0 0 16px;
-    color: var(--theme--foreground-subdued);
-    font-size: 14px;
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
 }
 
 .areas-table-wrapper {

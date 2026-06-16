@@ -1,9 +1,10 @@
 <template>
-  <div class="layout-blocks-grid-view" :class="{ 'compact': options.compactMode }">
+  <div ref="rootEl" class="layout-blocks-grid-view" :class="{ 'compact': options.compactMode }">
     <div class="grid-container">
       <div
         v-for="area in visibleAreas"
         :key="area.id"
+        :data-area-id="area.id"
         class="grid-area"
         :class="{
           'selected': selectedArea === area.id,
@@ -41,8 +42,17 @@
 
         <!-- Area Content -->
         <div class="area-content">
+          <!-- Loading Skeleton (mirrors the list view's per-area loading) -->
+          <div v-if="loading" class="area-skeleton">
+            <v-skeleton-loader
+              v-for="n in SKELETON_ROWS"
+              :key="n"
+              type="block-list-item"
+            />
+          </div>
+
           <transition-group
-            v-if="getAreaBlocks(area.id).length > 0"
+            v-else-if="getAreaBlocks(area.id).length > 0"
             name="block-list"
             tag="div"
             class="blocks-container"
@@ -102,7 +112,7 @@
 
 <script setup lang="ts">
 import { logger } from '../utils/logger';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import type {
   BlockItem,
@@ -126,6 +136,30 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Number of skeleton placeholders shown per area while blocks are loading.
+const SKELETON_ROWS = 3;
+
+// Root element, used to scope the "jump to area" scroll lookup.
+const rootEl = ref<HTMLElement | null>(null);
+
+// Delay before the "jump to area" scroll. The toolbar area selector is a v-menu;
+// selecting an item closes it and returns focus to the activator, which makes the
+// browser briefly scroll the page back up. Deferring past that focus-return lets
+// the jump stick. (The sticky toolbar keeps the selector reachable, but does not
+// by itself cancel the focus-return scroll.)
+const AREA_JUMP_SCROLL_DELAY_MS = 300;
+
+// "Jump to area": when an area becomes selected, scroll its card up. block:'start'
+// + the card's scroll-margin-top land it just below the sticky toolbar.
+watch(() => props.selectedArea, (areaId) => {
+  if (!areaId) return;
+  setTimeout(() => {
+    const cards = rootEl.value?.querySelectorAll('[data-area-id]');
+    const el = cards && Array.from(cards).find(c => c.getAttribute('data-area-id') === areaId);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, AREA_JUMP_SCROLL_DELAY_MS);
+});
 
 // Emits
 const emit = defineEmits<{
@@ -471,6 +505,10 @@ function handleAddBlock(areaId: string) {
   box-sizing: border-box;
   margin-bottom: 0px; /* For wrapping */
   position: relative;
+  /* Offset the "jump to area" scroll target below both sticky bars: Directus'
+     header-bar (--header-bar-height) + our own toolbar (--lb-toolbar-height, set
+     from its measured height in interface.vue) + a small gap. */
+  scroll-margin-top: calc(var(--header-bar-height, 61px) + var(--lb-toolbar-height, 78px) + 8px);
 
   &:hover {
     border-color: var(--theme--border-color-accent);
@@ -544,6 +582,13 @@ function handleAddBlock(areaId: string) {
   padding: 12px;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.area-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .blocks-container {

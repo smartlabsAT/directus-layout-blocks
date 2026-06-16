@@ -8,8 +8,15 @@
 
     <!-- Setup State -->
     <div v-else-if="!isSetupComplete && options.autoSetup" class="layout-blocks-setup">
-      <v-progress-circular indeterminate />
-      <p>Setting up layout blocks fields...</p>
+      <v-notice type="info">
+        <div class="notice-content">
+          <v-icon name="settings" />
+          <div>
+            <strong>Setting up layout blocks…</strong>
+            <p>Preparing the M2A relationship fields. This only happens once.</p>
+          </div>
+        </div>
+      </v-notice>
     </div>
 
     <!-- Error State -->
@@ -46,14 +53,17 @@
 
     <!-- Main Interface -->
     <div v-else class="layout-blocks-container" data-testid="layout-blocks-container">
+      <!-- Sentinel above the toolbar: flips `toolbarStuck` once the toolbar
+           pins, so we can show its shadow like Directus' own header-bar. -->
+      <div ref="toolbarSentinel" class="toolbar-sentinel" aria-hidden="true"></div>
+
       <!-- Toolbar -->
-      <div class="layout-blocks-toolbar">
+      <div ref="toolbarEl" class="layout-blocks-toolbar" :class="{ 'is-stuck': toolbarStuck }">
         <div class="toolbar-left">
           <v-button
             v-if="options.enableAreaManagement"
             v-tooltip="'Manage areas'"
             icon
-            rounded
             secondary
             @click="showAreaManager = true"
           >
@@ -62,22 +72,65 @@
         </div>
 
         <div class="toolbar-center">
-          <div v-if="selectedArea" class="selected-area-info">
-            <v-icon 
-              v-if="selectedAreaConfig?.icon" 
-              :name="selectedAreaConfig.icon" 
-              small 
-            />
-            <span>{{ selectedAreaConfig?.label || selectedArea }}</span>
-            <v-chip small>{{ getBlocksForArea(selectedArea).length }}</v-chip>
-          </div>
+          <!-- Area selector: switches the active area, driving the view's
+               v-model:selected-area (ListView tabs / GridView card highlight). -->
+          <v-menu v-if="computedAreas.length" show-arrow placement="bottom">
+            <template #activator="{ toggle }">
+              <v-button
+                secondary
+                small
+                class="area-select"
+                @click="toggle"
+              >
+                <v-icon
+                  v-if="selectedArea && selectedAreaConfig?.icon"
+                  :name="selectedAreaConfig.icon"
+                  small
+                  left
+                />
+                <span class="area-select__label">
+                  {{ selectedArea ? (selectedAreaConfig?.label || selectedArea) : 'All areas' }}
+                </span>
+                <v-chip v-if="selectedArea" x-small class="area-select__count">
+                  {{ getBlocksForArea(selectedArea).length }}
+                </v-chip>
+                <v-icon name="expand_more" small right />
+              </v-button>
+            </template>
+
+            <v-list>
+              <v-list-item
+                clickable
+                :active="!selectedArea"
+                @click="selectedArea = null"
+              >
+                <v-list-item-icon><v-icon name="dashboard" /></v-list-item-icon>
+                <v-list-item-content>All areas</v-list-item-content>
+              </v-list-item>
+              <v-list-item
+                v-for="area in computedAreas"
+                :key="area.id"
+                clickable
+                :active="selectedArea === area.id"
+                @click="selectedArea = area.id"
+              >
+                <v-list-item-icon>
+                  <v-icon :name="area.icon || 'crop_square'" />
+                </v-list-item-icon>
+                <v-list-item-content>{{ area.label || area.id }}</v-list-item-content>
+                <v-chip x-small>{{ getBlocksForArea(area.id).length }}</v-chip>
+                <v-icon v-if="area.locked" name="lock" x-small />
+              </v-list-item>
+            </v-list>
+          </v-menu>
         </div>
 
         <div class="toolbar-right">
           <v-button-group>
             <v-button
               v-tooltip="'Grid view'"
-              :secondary="viewMode !== 'grid'"
+              :active="viewMode === 'grid'"
+              secondary
               icon
               small
               @click="viewMode = 'grid'"
@@ -86,7 +139,8 @@
             </v-button>
             <v-button
               v-tooltip="'List view'"
-              :secondary="viewMode !== 'list'"
+              :active="viewMode === 'list'"
+              secondary
               icon
               small
               @click="viewMode = 'list'"
@@ -184,6 +238,7 @@
       <v-drawer
         v-model="drawerActive"
         :title="editingCollection ? `Edit ${getCollectionLabel(editingCollection)}` : 'Edit Block'"
+        :subtitle="editingCollection ? 'Editing in place' : undefined"
         icon="edit"
         persistent
         @cancel="handleDrawerCancel"
@@ -217,6 +272,7 @@
         v-if="options.enableAreaManagement"
         v-model="showAreaManager"
         title="Manage Areas"
+        subtitle="Define the regions blocks can be placed in"
         icon="dashboard_customize"
         persistent
         @cancel="showAreaManager = false"
@@ -231,12 +287,19 @@
         />
         
         <template #actions>
-          <v-button secondary @click="showAreaManager = false">
-            Cancel
-          </v-button>
-          <v-button @click="saveAreas">
-            Save Areas
-          </v-button>
+          <!-- Directus's v-drawer renders only the LAST child of its actions
+               slot (.action-buttons > :not(:last-child) { display: none }), so
+               wrap our buttons in one element to show both. The header's X
+               (top-left) is the native cancel/discard. -->
+          <div class="drawer-actions">
+            <v-button v-tooltip="'Add area'" secondary small @click="addAreaInManager">
+              <v-icon name="add" left />
+              Add area
+            </v-button>
+            <v-button @click="saveAreas">
+              Save Areas
+            </v-button>
+          </div>
         </template>
       </v-drawer>
     </div>
@@ -245,7 +308,7 @@
 
 <script setup lang="ts">
 import { logger } from './utils/logger';
-import { ref, computed, watch, onMounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
 import { useApi, useStores, useCollection } from '@directus/extensions-sdk';
 import { M2AHelper } from './utils/m2a-helper';
 import { useAutoSetup } from './composables/useAutoSetup';
@@ -452,6 +515,46 @@ const editSaving = ref(false);
 const editForm = ref<any>(null);
 const fieldOptions = ref<any>(null);
 const areaManagerRef = ref<any>(null);
+
+// Toolbar sticky-shadow: show a subtle shadow under the toolbar only once it is
+// stuck to the top (matching Directus' own header-bar). An IntersectionObserver
+// on a sentinel just above the toolbar flips `toolbarStuck`.
+const toolbarSentinel = ref<HTMLElement | null>(null);
+const toolbarEl = ref<HTMLElement | null>(null);
+const toolbarStuck = ref(false);
+let toolbarObserver: IntersectionObserver | null = null;
+
+watch(toolbarSentinel, (el) => {
+  // Re-create the observer whenever the sentinel node changes — the main
+  // interface can be re-rendered across loading/setup/error states, so we must
+  // not keep an observer bound to a detached node (the shadow would stop working).
+  toolbarObserver?.disconnect();
+  toolbarObserver = null;
+  if (!el) return;
+  const headerHeight = parseInt(
+    getComputedStyle(document.documentElement).getPropertyValue('--header-bar-height'),
+    10,
+  ) || 61;
+  toolbarObserver = new IntersectionObserver(
+    ([entry]) => { toolbarStuck.value = !entry.isIntersecting; },
+    { rootMargin: `-${headerHeight + 1}px 0px 0px 0px`, threshold: 0 },
+  );
+  toolbarObserver.observe(el);
+});
+
+// Expose the real toolbar height as a CSS variable so the grid's "jump to area"
+// scroll-margin lands just below it without a hardcoded magic number.
+watch(toolbarEl, (el) => {
+  if (el) {
+    document.documentElement.style.setProperty('--lb-toolbar-height', `${el.offsetHeight}px`);
+  }
+});
+
+onUnmounted(() => {
+  toolbarObserver?.disconnect();
+  toolbarObserver = null;
+  document.documentElement.style.removeProperty('--lb-toolbar-height');
+});
 
 // Computed property for current collection fields
 const editingCollectionFields = computed(() => {
@@ -1603,6 +1706,12 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
 }
 
 // Save areas from area manager
+// Triggers a new area row from the area-manager drawer header (the body
+// "Add area" button moved into the drawer #actions slot in #55).
+function addAreaInManager() {
+  areaManagerRef.value?.addArea();
+}
+
 function saveAreas() {
   if (areaManagerRef.value) {
     areaManagerRef.value.save();
@@ -1645,7 +1754,6 @@ watch(() => props.value, () => {
 }
 
 .layout-blocks-loading,
-.layout-blocks-setup,
 .layout-blocks-error {
   display: flex;
   flex-direction: column;
@@ -1687,9 +1795,10 @@ watch(() => props.value, () => {
   }
 }
 
-.layout-blocks-new-item {
+.layout-blocks-new-item,
+.layout-blocks-setup {
   padding: 20px;
-  
+
   .notice-content {
     display: flex;
     align-items: flex-start;
@@ -1718,13 +1827,32 @@ watch(() => props.value, () => {
   position: relative;
 }
 
+.toolbar-sentinel {
+  height: 0;
+}
+
 .layout-blocks-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--theme--border-color);
+  padding: var(--theme--form--field--input--padding, 12px) 0;
+  border-bottom: var(--theme--border-width) solid var(--theme--border-color);
   flex-shrink: 0;
+  /* Sticky so the view toggle and area selector stay reachable while scrolling,
+     and to show a subtle shadow once stuck (like Directus' own header-bar).
+     Pinned below Directus' own sticky header-bar via its --header-bar-height
+     variable. Note: sticking does NOT cancel the v-menu's focus-return scroll,
+     so the grid's "jump to area" still defers its scroll (see GridView). */
+  position: sticky;
+  top: var(--header-bar-height, 61px);
+  z-index: 2;
+  background: var(--theme--background);
+  transition: box-shadow 0.2s;
+
+  /* Subtle elevation once stuck, matching Directus' own header-bar shadow. */
+  &.is-stuck {
+    box-shadow: var(--theme--header--box-shadow);
+  }
 
   .toolbar-left,
   .toolbar-center,
@@ -1739,15 +1867,17 @@ watch(() => props.value, () => {
     justify-content: center;
   }
 
-  .selected-area-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 12px;
-    background: var(--theme--background-subdued);
-    border-radius: var(--theme--border-radius);
-    font-size: 14px;
-    color: var(--theme--foreground-subdued);
+  /* Area selector trigger (v-menu activator): a native v-button showing the
+     active area label + count. Switches the area context (drives the view's
+     v-model:selected-area). */
+  .area-select {
+    &__label {
+      font-weight: 600;
+    }
+
+    &__count {
+      margin-left: 6px;
+    }
   }
 }
 
@@ -1760,6 +1890,14 @@ watch(() => props.value, () => {
 .drawer-content {
   padding: 20px;
   min-height: 400px;
+}
+
+/* Wrapper so multiple drawer header actions survive Directus's
+   .action-buttons > :not(:last-child) { display: none } rule. */
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 </style>
