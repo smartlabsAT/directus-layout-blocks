@@ -6,21 +6,30 @@
     :close-on-content-click="true"
   >
     <template #activator="{ toggle, active }">
-      <div 
+      <div
         class="status-display"
         :class="{ clickable: editable }"
+        role="button"
+        tabindex="0"
+        aria-haspopup="listbox"
+        :aria-expanded="active"
+        :aria-label="`Status: ${getStatusLabel(status)}. Activate to change.`"
         @click="editable && toggle()"
+        @keydown.enter.prevent="editable && toggle()"
+        @keydown.space.prevent="editable && toggle()"
       >
         <span class="lb-status-dot" :class="`status-${status || 'draft'}`" />
         <span class="status-text">{{ getStatusLabel(status) }}</span>
       </div>
     </template>
-    
-    <v-list>
+
+    <v-list role="listbox">
       <v-list-item
         v-for="option in STATUS_OPTIONS"
         :key="option.value"
         clickable
+        role="option"
+        :aria-selected="(status || 'draft') === option.value"
         :active="(status || 'draft') === option.value"
         @click="$emit('update:status', option.value)"
       >
@@ -72,6 +81,12 @@ defineEmits<{
     &:hover {
       background-color: var(--theme--background-normal);
     }
+  }
+
+  /* Keyboard focus ring (a11y §1) — the status pill is a custom button. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+    outline-offset: 2px;
   }
 
   .status-text {

@@ -1,6 +1,6 @@
 <template>
   <v-card class="block-creator" data-testid="block-creator-dialog">
-    <v-card-title>Add a block</v-card-title>
+    <v-card-title id="lb-block-creator-title">Add a block</v-card-title>
 
     <!-- Step progress (decorative — ARIA/keyboard is handled in the accessibility pass, #56) -->
     <div class="wizard-steps">
@@ -54,7 +54,13 @@
             :key="collection.value"
             class="block-type-tile"
             :class="{ selected: selectedCollection === collection.value }"
+            role="button"
+            tabindex="0"
+            :aria-pressed="selectedCollection === collection.value"
+            :aria-label="collection.text"
             @click="selectCollectionOption(collection.value)"
+            @keydown.enter.prevent="selectCollectionOption(collection.value)"
+            @keydown.space.prevent="selectCollectionOption(collection.value)"
           >
             <div class="tile-icon">
               <v-icon :name="getCollectionIcon(collection.value)" large />
@@ -151,7 +157,7 @@
 
 <script setup lang="ts">
 import { logger } from '../utils/logger';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { useApi } from '@directus/extensions-sdk';
 import { useItemSelector, ItemSelectorDrawer } from 'directus-extension-expandable-blocks/shared';
 import type { AreaConfig, JunctionInfo } from '../types';
@@ -448,6 +454,17 @@ async function createNewItem() {
 watch(() => props.selectedArea, (newArea) => {
   if (newArea) localArea.value = newArea;
 });
+
+// Focus the first sensible control when the dialog opens (a11y §2). The card is
+// teleported to <body> by v-dialog, so query it there; best-effort (native
+// focus-trap keeps focus inside the dialog regardless).
+onMounted(() => {
+  nextTick(() => {
+    const root = document.querySelector('.block-creator');
+    const first = root?.querySelector<HTMLElement>('.creator-step .v-list-item, .creator-step .block-type-tile');
+    first?.focus();
+  });
+});
 </script>
 
 <style lang="scss" scoped>
@@ -546,6 +563,12 @@ watch(() => props.selectedArea, (newArea) => {
   cursor: pointer;
   transition: border-color 0.12s, background 0.12s;
 
+  /* Keyboard focus ring (a11y §1) — tiles are custom button-like elements. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+    outline-offset: 2px;
+  }
+
   .tile-icon {
     width: 46px;
     height: 46px;
@@ -580,5 +603,13 @@ watch(() => props.selectedArea, (newArea) => {
 
 .spacer {
   flex: 1;
+}
+
+/* Reduced motion (a11y §5): no tile hover/selection transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .block-type-tile,
+  .block-type-tile .tile-icon {
+    transition: none;
+  }
 }
 </style>

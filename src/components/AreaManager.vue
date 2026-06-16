@@ -39,8 +39,15 @@
 
                   <td class="icon-cell">
                     <v-menu v-if="!area.locked" show-arrow placement="bottom">
-                      <template #activator="{ toggle }">
-                        <v-button icon x-small @click="toggle">
+                      <template #activator="{ toggle, active }">
+                        <v-button
+                          icon
+                          x-small
+                          aria-label="Choose area icon"
+                          aria-haspopup="menu"
+                          :aria-expanded="active"
+                          @click="toggle"
+                        >
                           <v-icon :name="area.icon || 'dashboard_customize'" />
                         </v-button>
                       </template>
@@ -219,10 +226,13 @@
                         show-arrow
                         placement="bottom-start"
                       >
-                        <template #activator="{ toggle }">
+                        <template #activator="{ toggle, active }">
                           <v-button
                             x-small
                             icon
+                            aria-label="Add allowed collection"
+                            aria-haspopup="menu"
+                            :aria-expanded="active"
                             @click="toggle"
                           >
                             <v-icon name="add" />
@@ -246,6 +256,7 @@
                     <v-button
                       v-if="!area.locked"
                       v-tooltip="'Remove area'"
+                      aria-label="Remove area"
                       icon
                       x-small
                       secondary

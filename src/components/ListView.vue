@@ -1,15 +1,20 @@
 <template>
-  <div class="layout-blocks-list-view">
-    <!-- Area Tabs -->
-    <div class="area-tabs">
+  <div ref="rootEl" class="layout-blocks-list-view">
+    <!-- Area Tabs (radiogroup: ←/→ moves between tabs, roving tabindex) -->
+    <div class="area-tabs" role="radiogroup" aria-label="Areas">
       <!-- All Blocks Tab -->
       <button
         class="area-tab"
-        :class="{ 
+        role="radio"
+        data-tab-id="all"
+        :aria-checked="selectedArea === null"
+        :tabindex="selectedArea === null ? 0 : -1"
+        :class="{
           active: selectedArea === null,
           'has-blocks': true
         }"
         @click="selectArea(null)"
+        @keydown="handleTabKeydown($event, null)"
       >
         <v-icon name="view_list" small />
         <span>All Blocks</span>
@@ -17,19 +22,24 @@
           {{ blocks.length }}
         </v-chip>
       </button>
-      
+
       <!-- Defined Area Tabs -->
       <button
         v-for="area in visibleAreas"
         :key="area.id"
         class="area-tab"
-        :class="{ 
+        role="radio"
+        :data-tab-id="area.id"
+        :aria-checked="selectedArea === area.id"
+        :tabindex="selectedArea === area.id ? 0 : -1"
+        :class="{
           active: selectedArea === area.id,
           'has-blocks': hasBlocks(area.id),
           'orphaned': area.id === 'orphaned'
         }"
         :data-area-id="area.id"
         @click="selectArea(area.id)"
+        @keydown="handleTabKeydown($event, area.id)"
         @dragover.prevent="handleAreaDragOver"
         @drop="handleAreaDrop($event, area.id)"
         @dragleave="handleAreaDragLeave"
@@ -68,7 +78,7 @@
 
       <!-- Blocks List -->
       <div v-else-if="selectedAreaBlocks.length > 0" class="blocks-list">
-        <table class="blocks-table">
+        <table class="blocks-table" role="grid">
           <thead>
             <tr>
               <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" style="width: 40px"></th>
@@ -106,13 +116,25 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="block in selectedAreaBlocks" :key="block.id" class="block-row">
+            <tr
+              v-for="block in selectedAreaBlocks"
+              :key="block.id"
+              class="block-row"
+              :class="{ 'kb-grabbed': kbIsGrabbed(block.id) }"
+              role="row"
+            >
               <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" class="drag-cell">
                 <div
                   class="drag-handle"
+                  role="button"
+                  tabindex="0"
+                  aria-roledescription="sortable"
+                  :aria-label="`Reorder ${getBlockTitle(block)}`"
+                  :data-block-id="block.id"
                   :draggable="true"
                   @dragstart="handleDragStart($event, block)"
                   @dragend="handleDragEnd"
+                  @keydown="handleBlockKeydown($event, block)"
                 >
                   <v-icon name="drag_handle" />
                 </div>
@@ -164,6 +186,7 @@
                   <v-button
                     v-if="permissions.update"
                     v-tooltip="'Edit'"
+                    aria-label="Edit block"
                     icon
                     x-small
                     secondary
@@ -171,10 +194,11 @@
                   >
                     <v-icon name="edit" />
                   </v-button>
-                  
+
                   <v-button
                     v-if="permissions.create"
                     v-tooltip="'Duplicate'"
+                    aria-label="Duplicate block"
                     icon
                     x-small
                     secondary
@@ -182,10 +206,11 @@
                   >
                     <v-icon name="content_copy" />
                   </v-button>
-                  
+
                   <v-button
                     v-if="permissions.delete"
                     v-tooltip="'Remove'"
+                    aria-label="Remove block"
                     icon
                     x-small
                     secondary
@@ -225,16 +250,20 @@
     <div v-else class="no-area-selected">
       <p>Select an area to view blocks</p>
     </div>
+
+    <!-- Visually-hidden live region: announces keyboard drag & drop steps. -->
+    <div class="lb-sr-only" role="status" aria-live="polite">{{ kbAnnouncement }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { logger } from '../utils/logger';
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import StatusSelector from './StatusSelector.vue';
 import EmptyState from './EmptyState.vue';
 import { createDragImage } from '../utils/blockHelpers';
+import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 import type {
   BlockItem,
   BlockId,
@@ -275,6 +304,10 @@ const emit = defineEmits<{
 
 // Local State
 const draggedBlock = ref<BlockItem | null>(null);
+
+// Root element, used to scope keyboard-focus lookups (re-focusing a row's grab
+// handle after a move re-renders the table).
+const rootEl = ref<HTMLElement | null>(null);
 
 // Number of placeholder rows shown while blocks are loading
 const SKELETON_ROWS = 5;
@@ -372,6 +405,51 @@ const collectionIcons: Record<string, string> = {
   content_hero: 'landscape',
   content_cta: 'ads_click'
 };
+
+// Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3): the row's drag handle is the
+// grab target. ListView shows one area at a time, so onAreaChange follows the
+// block to keep it visible (and focusable) when it crosses to another area.
+function focusBlock(blockId: BlockId): void {
+  nextTick(() => {
+    const el = rootEl.value?.querySelector(`.drag-handle[data-block-id="${CSS.escape(String(blockId))}"]`);
+    (el as HTMLElement | null)?.focus();
+  });
+}
+
+const {
+  announcement: kbAnnouncement,
+  isGrabbed: kbIsGrabbed,
+  handleBlockKeydown,
+} = useKeyboardDnd({
+  areas: visibleAreas,
+  getAreaBlocks,
+  canDrop: canDropInArea,
+  emitMove: (payload) => emit('move-block', payload),
+  enabled: () => !!props.options.enableDragDrop,
+  getTitle: getBlockTitle,
+  focusBlock,
+  onAreaChange: (areaId) => selectArea(areaId),
+});
+
+// Area tabs form a radiogroup (a11y §2): the ordered tab ids, left → right
+// ("All Blocks" is represented by null).
+const tabOrder = computed<(string | null)[]>(() => [null, ...visibleAreas.value.map((a) => a.id)]);
+
+function handleTabKeydown(event: KeyboardEvent, currentId: string | null): void {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  const order = tabOrder.value;
+  const i = order.findIndex((id) => id === currentId);
+  if (i === -1) return;
+  const dir = event.key === 'ArrowLeft' ? -1 : 1;
+  const next = order[(i + dir + order.length) % order.length];
+  selectArea(next);
+  nextTick(() => {
+    const sel = next === null ? 'all' : CSS.escape(String(next));
+    const el = rootEl.value?.querySelector(`.area-tab[data-tab-id="${sel}"]`);
+    (el as HTMLElement | null)?.focus();
+  });
+}
 
 // Methods
 function getAreaBlocks(areaId: string): BlockItem[] {
@@ -653,6 +731,12 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
       color: var(--theme--foreground);
     }
 
+    /* Keyboard focus ring (a11y §1). */
+    &:focus-visible {
+      outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+      outline-offset: -2px;
+    }
+
     /* Segmented look: active tab = primary text + a 2px underline indicator
        (no filled background, so the legacy --foreground-inverted token is gone). */
     &.active {
@@ -827,11 +911,19 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
     align-items: center;
     justify-content: center;
     padding: 4px;
-    
+    border-radius: var(--theme--border-radius);
+
     &:hover {
       color: var(--theme--foreground);
     }
-    
+
+    /* Keyboard focus ring (a11y §1) — the handle is the keyboard grab target. */
+    &:focus-visible {
+      outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+      outline-offset: 2px;
+      color: var(--theme--foreground);
+    }
+
     &:active {
       cursor: grabbing;
     }
@@ -883,6 +975,33 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   align-items: center;
   justify-content: center;
   color: var(--theme--foreground-subdued);
+}
+
+/* Keyboard-grabbed row highlight (a11y §3) — mirrors the pointer .dragging look.
+   Full path so it out-specifies the base `td` background. */
+.blocks-list .blocks-table tbody tr.block-row.kb-grabbed td {
+  background-color: var(--theme--primary-background);
+}
+
+/* Visually-hidden live region (a11y §3). */
+.lb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion (a11y §5). */
+@media (prefers-reduced-motion: reduce) {
+  .area-tab,
+  .block-row td {
+    transition: none;
+  }
 }
 </style>
 

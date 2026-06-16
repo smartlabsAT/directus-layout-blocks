@@ -63,6 +63,7 @@
           <v-button
             v-if="options.enableAreaManagement"
             v-tooltip="'Manage areas'"
+            aria-label="Manage areas"
             icon
             secondary
             @click="showAreaManager = true"
@@ -75,11 +76,13 @@
           <!-- Area selector: switches the active area, driving the view's
                v-model:selected-area (ListView tabs / GridView card highlight). -->
           <v-menu v-if="computedAreas.length" show-arrow placement="bottom">
-            <template #activator="{ toggle }">
+            <template #activator="{ toggle, active }">
               <v-button
                 secondary
                 small
                 class="area-select"
+                aria-haspopup="menu"
+                :aria-expanded="active"
                 @click="toggle"
               >
                 <v-icon
@@ -126,24 +129,36 @@
         </div>
 
         <div class="toolbar-right">
-          <v-button-group>
+          <v-button-group role="radiogroup" aria-label="View mode">
             <v-button
               v-tooltip="'Grid view'"
+              aria-label="Grid view"
+              role="radio"
+              data-view="grid"
+              :aria-checked="viewMode === 'grid'"
+              :tabindex="viewMode === 'grid' ? 0 : -1"
               :active="viewMode === 'grid'"
               secondary
               icon
               small
               @click="viewMode = 'grid'"
+              @keydown="handleViewKeydown"
             >
               <v-icon name="grid_view" />
             </v-button>
             <v-button
               v-tooltip="'List view'"
+              aria-label="List view"
+              role="radio"
+              data-view="list"
+              :aria-checked="viewMode === 'list'"
+              :tabindex="viewMode === 'list' ? 0 : -1"
               :active="viewMode === 'list'"
               secondary
               icon
               small
               @click="viewMode = 'list'"
+              @keydown="handleViewKeydown"
             >
               <v-icon name="view_list" />
             </v-button>
@@ -180,6 +195,8 @@
         v-model="showBlockCreator"
         :title="null"
         persistent
+        aria-labelledby="lb-block-creator-title"
+        @esc="showBlockCreator = false"
       >
         <template #default>
           <block-creator
@@ -242,6 +259,7 @@
         icon="edit"
         persistent
         @cancel="handleDrawerCancel"
+        @esc="handleDrawerCancel"
       >
 
         
@@ -276,6 +294,7 @@
         icon="dashboard_customize"
         persistent
         @cancel="showAreaManager = false"
+        @esc="showAreaManager = false"
       >
         <area-manager
           v-if="showAreaManager"
@@ -515,6 +534,35 @@ const editSaving = ref(false);
 const editForm = ref<any>(null);
 const fieldOptions = ref<any>(null);
 const areaManagerRef = ref<any>(null);
+
+// View toggle is a radiogroup (a11y §2): ←/→ switches modes and moves focus to
+// the now-selected button (roving tabindex).
+function handleViewKeydown(event: KeyboardEvent) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid';
+  nextTick(() => {
+    const btn = toolbarEl.value?.querySelector(`[data-view="${viewMode.value}"]`);
+    (btn as HTMLElement | null)?.focus();
+  });
+}
+
+// Return focus to the trigger when a dialog/drawer closes (a11y §2). Capturing
+// document.activeElement at open time covers the common triggers (toolbar /
+// action buttons); a detached trigger just no-ops on restore.
+const lastOverlayTrigger = ref<HTMLElement | null>(null);
+function rememberOverlayTrigger() {
+  const el = document.activeElement;
+  lastOverlayTrigger.value = el instanceof HTMLElement ? el : null;
+}
+function restoreOverlayTrigger() {
+  const el = lastOverlayTrigger.value;
+  lastOverlayTrigger.value = null;
+  if (el && document.contains(el)) nextTick(() => el.focus());
+}
+watch(showAreaManager, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
+watch(showBlockCreator, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
+watch(drawerActive, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
 
 // Toolbar sticky-shadow: show a subtle shadow under the toolbar only once it is
 // stuck to the top (matching Directus' own header-bar). An IntersectionObserver

@@ -1,9 +1,12 @@
 <template>
   <div class="add-block-dropdown">
     <v-menu placement="bottom-start" show-arrow>
-      <template #activator="{ toggle }">
+      <template #activator="{ toggle, active }">
         <v-button
           v-tooltip="'Create new block'"
+          aria-label="Create new block"
+          aria-haspopup="menu"
+          :aria-expanded="active"
           icon
           :small="size === 'small'"
           :x-small="size === 'x-small'"
@@ -31,9 +34,12 @@
     </v-menu>
 
     <v-menu placement="bottom-start" show-arrow>
-      <template #activator="{ toggle }">
+      <template #activator="{ toggle, active }">
         <v-button
           v-tooltip="'Link or duplicate existing'"
+          aria-label="Link or duplicate existing"
+          aria-haspopup="menu"
+          :aria-expanded="active"
           icon
           :small="size === 'small'"
           :x-small="size === 'x-small'"
