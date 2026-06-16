@@ -179,7 +179,7 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
     const key = event.key;
 
     if (grabbedId.value === null) {
-      if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+      if (key === 'Enter' || key === ' ') {
         event.preventDefault();
         event.stopPropagation();
         grab(block);
@@ -198,7 +198,6 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
         break;
       case 'Enter':
       case ' ':
-      case 'Spacebar':
         event.preventDefault();
         event.stopPropagation();
         drop(block);

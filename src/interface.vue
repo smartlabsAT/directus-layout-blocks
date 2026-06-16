@@ -63,7 +63,7 @@
           <v-button
             v-if="options.enableAreaManagement"
             v-tooltip="'Manage areas'"
-            aria-label="Manage areas"
+            v-btn-aria="{ 'aria-label': 'Manage areas' }"
             icon
             secondary
             @click="showAreaManager = true"
@@ -81,8 +81,7 @@
                 secondary
                 small
                 class="area-select"
-                aria-haspopup="menu"
-                :aria-expanded="active"
+                v-btn-aria="{ 'aria-haspopup': 'menu', 'aria-expanded': active }"
                 @click="toggle"
               >
                 <v-icon
@@ -132,11 +131,7 @@
           <v-button-group role="radiogroup" aria-label="View mode">
             <v-button
               v-tooltip="'Grid view'"
-              aria-label="Grid view"
-              role="radio"
-              data-view="grid"
-              :aria-checked="viewMode === 'grid'"
-              :tabindex="viewMode === 'grid' ? 0 : -1"
+              v-btn-aria="{ role: 'radio', 'aria-label': 'Grid view', 'aria-checked': viewMode === 'grid', tabindex: viewMode === 'grid' ? 0 : -1, 'data-view': 'grid' }"
               :active="viewMode === 'grid'"
               secondary
               icon
@@ -148,11 +143,7 @@
             </v-button>
             <v-button
               v-tooltip="'List view'"
-              aria-label="List view"
-              role="radio"
-              data-view="list"
-              :aria-checked="viewMode === 'list'"
-              :tabindex="viewMode === 'list' ? 0 : -1"
+              v-btn-aria="{ role: 'radio', 'aria-label': 'List view', 'aria-checked': viewMode === 'list', tabindex: viewMode === 'list' ? 0 : -1, 'data-view': 'list' }"
               :active="viewMode === 'list'"
               secondary
               icon
@@ -327,6 +318,7 @@
 
 <script setup lang="ts">
 import { logger } from './utils/logger';
+import { vBtnAria } from './directives/btnAria';
 import { ref, computed, watch, onMounted, onUnmounted, inject, resolveComponent, nextTick, useAttrs, getCurrentInstance } from 'vue';
 import { useApi, useStores, useCollection } from '@directus/extensions-sdk';
 import { M2AHelper } from './utils/m2a-helper';

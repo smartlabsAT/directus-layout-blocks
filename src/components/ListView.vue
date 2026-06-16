@@ -80,34 +80,34 @@
       <div v-else-if="selectedAreaBlocks.length > 0" class="blocks-list">
         <table class="blocks-table" role="grid">
           <thead>
-            <tr>
-              <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" style="width: 40px"></th>
-              <th style="width: 40px"></th>
-              <th>
+            <tr role="row">
+              <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" role="columnheader" style="width: 40px"></th>
+              <th role="columnheader" style="width: 40px"></th>
+              <th role="columnheader">
                 <div class="header-with-icon">
                   <v-icon name="title" small />
                   <span>Title</span>
                 </div>
               </th>
-              <th style="width: 20%">
+              <th role="columnheader" style="width: 20%">
                 <div class="header-with-icon">
                   <v-icon name="category" small />
                   <span>Type</span>
                 </div>
               </th>
-              <th style="width: 15%">
+              <th role="columnheader" style="width: 15%">
                 <div class="header-with-icon">
                   <v-icon name="check_circle" small />
                   <span>Status</span>
                 </div>
               </th>
-              <th v-if="selectedArea === null || selectedArea === 'orphaned'" style="width: 15%">
+              <th v-if="selectedArea === null || selectedArea === 'orphaned'" role="columnheader" style="width: 15%">
                 <div class="header-with-icon">
                   <v-icon name="dashboard" small />
                   <span>Area</span>
                 </div>
               </th>
-              <th style="width: 120px; text-align: right">
+              <th role="columnheader" style="width: 120px; text-align: right">
                 <div class="header-with-icon" style="justify-content: flex-end">
                   <v-icon name="settings" small />
                   <span>Actions</span>
@@ -123,7 +123,7 @@
               :class="{ 'kb-grabbed': kbIsGrabbed(block.id) }"
               role="row"
             >
-              <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" class="drag-cell">
+              <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" role="gridcell" class="drag-cell">
                 <div
                   class="drag-handle"
                   role="button"
@@ -140,11 +140,11 @@
                 </div>
               </td>
               
-              <td class="icon-cell">
+              <td role="gridcell" class="icon-cell">
                 <v-icon :name="getBlockIcon(block)" />
               </td>
               
-              <td class="title-cell">
+              <td role="gridcell" class="title-cell">
                 <div class="block-title-cell">
                   <strong>{{ getBlockTitle(block) }}</strong>
                   <div v-if="getBlockSubtitle(block)" class="subtitle">
@@ -153,11 +153,11 @@
                 </div>
               </td>
               
-              <td class="type-cell">
+              <td role="gridcell" class="type-cell">
                 <v-chip small>{{ getCollectionLabel(block) }}</v-chip>
               </td>
               
-              <td class="status-cell">
+              <td role="gridcell" class="status-cell">
                 <status-selector
                   v-if="block.item"
                   :status="block.item.status"
@@ -166,7 +166,7 @@
                 />
               </td>
               
-              <td v-if="selectedArea === null || selectedArea === 'orphaned'" class="area-cell">
+              <td v-if="selectedArea === null || selectedArea === 'orphaned'" role="gridcell" class="area-cell">
                 <v-chip 
                   v-if="getAreaForBlock(block)"
                   small
@@ -181,12 +181,12 @@
                 </v-chip>
               </td>
               
-              <td class="actions-cell">
+              <td role="gridcell" class="actions-cell">
                 <div class="actions-wrapper">
                   <v-button
                     v-if="permissions.update"
                     v-tooltip="'Edit'"
-                    aria-label="Edit block"
+                    v-btn-aria="{ 'aria-label': 'Edit block' }"
                     icon
                     x-small
                     secondary
@@ -198,7 +198,7 @@
                   <v-button
                     v-if="permissions.create"
                     v-tooltip="'Duplicate'"
-                    aria-label="Duplicate block"
+                    v-btn-aria="{ 'aria-label': 'Duplicate block' }"
                     icon
                     x-small
                     secondary
@@ -210,7 +210,7 @@
                   <v-button
                     v-if="permissions.delete"
                     v-tooltip="'Remove'"
-                    aria-label="Remove block"
+                    v-btn-aria="{ 'aria-label': 'Remove block' }"
                     icon
                     x-small
                     secondary
@@ -264,6 +264,7 @@ import StatusSelector from './StatusSelector.vue';
 import EmptyState from './EmptyState.vue';
 import { createDragImage } from '../utils/blockHelpers';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
+import { vBtnAria } from '../directives/btnAria';
 import type {
   BlockItem,
   BlockId,

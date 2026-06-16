@@ -50,11 +50,10 @@
         show-arrow
         placement="bottom-end"
       >
-        <template #activator="{ toggle }">
+        <template #activator="{ toggle, active }">
           <v-button
             v-tooltip="'Options'"
-            aria-label="Block options"
-            aria-haspopup="menu"
+            v-btn-aria="{ 'aria-label': 'Block options', 'aria-haspopup': 'menu', 'aria-expanded': active }"
             icon
             x-small
             secondary
@@ -135,6 +134,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
 import StatusSelector from './StatusSelector.vue';

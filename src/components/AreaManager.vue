@@ -43,9 +43,7 @@
                         <v-button
                           icon
                           x-small
-                          aria-label="Choose area icon"
-                          aria-haspopup="menu"
-                          :aria-expanded="active"
+                          v-btn-aria="{ 'aria-label': 'Choose area icon', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                           @click="toggle"
                         >
                           <v-icon :name="area.icon || 'dashboard_customize'" />
@@ -230,9 +228,7 @@
                           <v-button
                             x-small
                             icon
-                            aria-label="Add allowed collection"
-                            aria-haspopup="menu"
-                            :aria-expanded="active"
+                            v-btn-aria="{ 'aria-label': 'Add allowed collection', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                             @click="toggle"
                           >
                             <v-icon name="add" />
@@ -256,7 +252,7 @@
                     <v-button
                       v-if="!area.locked"
                       v-tooltip="'Remove area'"
-                      aria-label="Remove area"
+                      v-btn-aria="{ 'aria-label': 'Remove area' }"
                       icon
                       x-small
                       secondary
@@ -299,6 +295,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
 import type { AreaConfig } from '../types';
