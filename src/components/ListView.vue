@@ -735,7 +735,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 
     /* Keyboard focus ring (a11y §1). */
     &:focus-visible {
-      outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+      outline: 2px solid var(--theme--primary);
       outline-offset: -2px;
     }
 
@@ -921,7 +921,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 
     /* Keyboard focus ring (a11y §1) — the handle is the keyboard grab target. */
     &:focus-visible {
-      outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+      outline: 2px solid var(--theme--primary);
       outline-offset: 2px;
       color: var(--theme--foreground);
     }

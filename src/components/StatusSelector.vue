@@ -85,7 +85,7 @@ defineEmits<{
 
   /* Keyboard focus ring (a11y §1) — the status pill is a custom button. */
   &:focus-visible {
-    outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+    outline: 2px solid var(--theme--primary);
     outline-offset: 2px;
   }
 

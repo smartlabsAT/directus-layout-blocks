@@ -741,7 +741,7 @@ defineExpose({
   }
 
   &:not(.locked):focus-visible {
-    outline: 2px solid var(--theme--form--field--input--focus-ring-color);
+    outline: 2px solid var(--theme--primary);
     outline-offset: 2px;
   }
 
