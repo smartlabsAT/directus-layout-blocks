@@ -157,6 +157,7 @@
                     </div>
                     <v-select
                       v-else
+                      :ref="captureInput"
                       v-model="editingValue"
                       :items="WIDTH_OPTIONS"
                       @update:model-value="saveEditWidth(area)"
@@ -294,6 +295,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
 import type { AreaConfig } from '../types';
 import { WIDTH_OPTIONS } from '../utils/constants';
@@ -337,13 +339,12 @@ const editingValue = ref<string | number | null>(null);
 // the next field on Tab — otherwise the trailing blur would immediately re-close
 // the freshly opened field (and double-commit the previous one).
 const isProgrammaticSwitch = ref(false);
-// Captures the currently mounted edit input (only one renders at a time) so the
-// Tab chain can focus + select its text via the DOM.
-const activeInput = ref<{ $el?: HTMLElement } | null>(null);
-
 // Initialize areas on mount
 onMounted(() => {
-  localAreas.value = [...props.areas];
+  // Deep clone so inline edits stay isolated to the drawer until "Save Areas".
+  // A plain spread would share the area objects with the parent, leaking edits
+  // before save and making Cancel non-discarding.
+  localAreas.value = cloneDeep(props.areas);
 });
 
 // Computed
@@ -438,7 +439,6 @@ function startEdit(index: number, field: TextEditField, value: string | number |
   editingArea.value = index;
   editingField.value = field;
   editingValue.value = value;
-  focusActiveInput();
 }
 
 function startEditWidth(index: number, area: AreaConfig) {
@@ -451,10 +451,8 @@ function saveEdit(area: AreaConfig, field: TextEditField) {
   if (field === 'id') {
     area.id = sanitizeAreaId(String(editingValue.value ?? ''));
   } else if (field === 'maxItems') {
-    area.maxItems =
-      editingValue.value === '' || editingValue.value == null
-        ? undefined
-        : Number(editingValue.value);
+    const n = Number(editingValue.value);
+    area.maxItems = Number.isFinite(n) && n >= 0 ? n : undefined;
   } else {
     area.label = String(editingValue.value ?? '');
   }
@@ -523,22 +521,19 @@ function onValueKeydown(e: KeyboardEvent, index: number, field: EditableField, a
   }
 }
 
-// `autofocus` is unreliable when an input is toggled in via v-if, so we capture
-// the mounted input and focus+select it explicitly (also satisfies §4 "focus +
-// text selected"). Only the active (non-null) ref is stored.
+// Focus + select the inline edit control the moment it mounts. A function `:ref`
+// fires after the element is in the DOM, so this is deterministic — more robust
+// than a queued nextTick, where the ref-update order isn't guaranteed during a
+// Tab advance (the old input may unmount after the new one mounts). Bound on the
+// text v-inputs AND the width v-select (whose trigger is an <input>), so the Tab
+// chain keeps focus across every field. `autofocus` is unreliable on v-if toggle.
 function captureInput(el: unknown) {
-  if (el) activeInput.value = el as { $el?: HTMLElement };
-}
-
-function focusActiveInput() {
-  nextTick(() => {
-    const root = activeInput.value?.$el;
-    const input = root?.querySelector('input');
-    if (input) {
-      input.focus();
-      input.select();
-    }
-  });
+  if (!el) return;
+  const input = (el as { $el?: HTMLElement }).$el?.querySelector('input');
+  if (input) {
+    input.focus();
+    input.select();
+  }
 }
 
 // Collection management
