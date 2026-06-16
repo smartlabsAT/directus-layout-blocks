@@ -210,11 +210,25 @@ const visibleAreas = computed(() => {
 // Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3) — the focused block card itself
 // is the grab target (no separate handle in the grid). Reuses the very same
 // canDropInArea predicate as the pointer path so the rules stay identical.
+/* Just past the .block-list leave/move transition (0.3s, see <style>). After a
+   cross-area move the LEAVING card lingers in its old area's transition-group
+   for that long and steals focus back to <body> when it is finally removed — so
+   besides the immediate attempt we re-assert focus once the transition settled. */
+const FOCUS_SETTLE_MS = 380;
+
 function focusBlock(blockId: BlockId): void {
-  nextTick(() => {
-    const el = rootEl.value?.querySelector(`[data-block-id="${CSS.escape(String(blockId))}"]`);
-    (el as HTMLElement | null)?.focus();
-  });
+  /* During the leave/enter transition there can briefly be TWO [data-block-id]
+     nodes (leaving ghost + entering card). Focus the one that is NOT leaving. */
+  const focusNonLeaving = () => {
+    const nodes = rootEl.value?.querySelectorAll(`[data-block-id="${CSS.escape(String(blockId))}"]`);
+    const el = nodes && (Array.from(nodes).find((n) =>
+      !n.classList.contains('block-list-leave-active') &&
+      !n.classList.contains('block-list-leave-to')
+    ) as HTMLElement | undefined);
+    el?.focus();
+  };
+  nextTick(focusNonLeaving);          /* fast path (within-area moves) */
+  setTimeout(focusNonLeaving, FOCUS_SETTLE_MS);  /* re-assert after the transition settles */
 }
 
 const {

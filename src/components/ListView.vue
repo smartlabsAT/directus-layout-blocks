@@ -410,11 +410,21 @@ const collectionIcons: Record<string, string> = {
 // Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3): the row's drag handle is the
 // grab target. ListView shows one area at a time, so onAreaChange follows the
 // block to keep it visible (and focusable) when it crosses to another area.
+/* Re-assert focus after the row re-render settles (mirrors GridView). */
+const FOCUS_SETTLE_MS = 380;
+
 function focusBlock(blockId: BlockId): void {
-  nextTick(() => {
-    const el = rootEl.value?.querySelector(`.drag-handle[data-block-id="${CSS.escape(String(blockId))}"]`);
-    (el as HTMLElement | null)?.focus();
-  });
+  /* When a block crosses areas the table re-renders (ListView follows via
+     onAreaChange), so the row's grab handle may not exist on the first tick.
+     Focus immediately if present, and re-assert once the re-render settled. */
+  const tryFocus = () => {
+    const el = rootEl.value?.querySelector(
+      `.drag-handle[data-block-id="${CSS.escape(String(blockId))}"]`
+    ) as HTMLElement | null;
+    el?.focus();
+  };
+  nextTick(tryFocus);
+  setTimeout(tryFocus, FOCUS_SETTLE_MS);
 }
 
 const {
