@@ -42,6 +42,13 @@ export interface KeyboardDndDeps {
    */
   focusBlock: (blockId: BlockId) => void;
   /**
+   * Ordered ids of the currently focusable blocks, used by ↑/↓ to move the
+   * FOCUS between blocks while nothing is grabbed (navigation mode). GridView
+   * flattens all visible areas (DOM order); ListView returns the rendered rows
+   * of the selected area.
+   */
+  navOrder: () => BlockId[];
+  /**
    * Optional: let the view follow the block when it changes area (ListView shows
    * one area at a time, so it switches the selected area to keep the block
    * visible). GridView shows all areas at once and omits this.
@@ -171,6 +178,19 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
   }
 
   /**
+   * Navigation mode (nothing grabbed): move FOCUS to the previous/next block in
+   * nav order. Stops at the ends (no wrap). Lets a keyboard user walk block to
+   * block with ↑/↓ instead of tabbing through each block and its actions button.
+   */
+  function focusAdjacent(block: BlockItem, direction: -1 | 1): void {
+    const order = deps.navOrder();
+    const i = order.findIndex((id) => id === block.id);
+    if (i === -1) return;
+    const target = order[i + direction];
+    if (target !== undefined) deps.focusBlock(target);
+  }
+
+  /**
    * Keydown handler bound to each block's grab element. The view passes the
    * block currently rendered at that element.
    */
@@ -179,10 +199,19 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
     const key = event.key;
 
     if (grabbedId.value === null) {
+      /* Navigation mode: nothing grabbed → Enter/Space grabs, arrows move FOCUS. */
       if (key === 'Enter' || key === ' ') {
         event.preventDefault();
         event.stopPropagation();
         grab(block);
+      } else if (key === 'ArrowDown') {
+        event.preventDefault();
+        event.stopPropagation();
+        focusAdjacent(block, 1);
+      } else if (key === 'ArrowUp') {
+        event.preventDefault();
+        event.stopPropagation();
+        focusAdjacent(block, -1);
       }
       return;
     }

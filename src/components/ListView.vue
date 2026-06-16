@@ -429,6 +429,7 @@ const {
   enabled: () => !!props.options.enableDragDrop,
   getTitle: getBlockTitle,
   focusBlock,
+  navOrder: () => selectedAreaBlocks.value.map((b) => b.id),
   onAreaChange: (areaId) => selectArea(areaId),
 });
 

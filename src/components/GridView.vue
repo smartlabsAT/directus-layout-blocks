@@ -229,6 +229,7 @@ const {
   enabled: () => !!props.options.enableDragDrop,
   getTitle: (block) => getBlockTitle(block),
   focusBlock,
+  navOrder: () => visibleAreas.value.flatMap((a) => getAreaBlocks(a.id).map((b) => b.id)),
 });
 
 // Methods
