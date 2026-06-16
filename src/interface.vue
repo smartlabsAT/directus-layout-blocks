@@ -102,7 +102,7 @@
         <component
           :is="viewComponent"
           v-model:blocks="blocks"
-          v-model:selectedArea="selectedArea"
+          v-model:selected-area="selectedArea"
           :areas="computedAreas"
           :options="options"
           :junction-info="junctionInfo"
@@ -225,7 +225,6 @@
           v-if="showAreaManager"
           ref="areaManagerRef"
           :areas="allConfiguredAreas"
-          :default-areas="options.areas || []"
           :available-collections="formattedAllowedCollections"
           @update:areas="handleAreasUpdate"
           @close="showAreaManager = false"
@@ -788,10 +787,13 @@ async function retrySetup() {
   await initialize();
 }
 
-// Watch for changes in allowed collections and update ItemSelector
+// Watch for changes in allowed collections and update ItemSelector.
+// `updateCollections` is NOT exposed by the shared useItemSelector composable
+// (from the expandable-blocks package), so guard the call — otherwise saving
+// areas (which recomputes allowedCollections and fires this watcher) throws
+// "updateCollections is not a function". Pre-existing; surfaced via Save Areas.
 watch(allowedCollections, (newCollections) => {
-  if (newCollections && itemSelector) {
-    // Update ItemSelector with new allowed collections
+  if (newCollections && itemSelector && typeof itemSelector.updateCollections === 'function') {
     itemSelector.updateCollections(newCollections);
   }
 }, { immediate: false });
