@@ -58,7 +58,7 @@
       <div ref="toolbarSentinel" class="toolbar-sentinel" aria-hidden="true"></div>
 
       <!-- Toolbar -->
-      <div class="layout-blocks-toolbar" :class="{ 'is-stuck': toolbarStuck }">
+      <div ref="toolbarEl" class="layout-blocks-toolbar" :class="{ 'is-stuck': toolbarStuck }">
         <div class="toolbar-left">
           <v-button
             v-if="options.enableAreaManagement"
@@ -75,12 +75,11 @@
           <!-- Area selector: switches the active area, driving the view's
                v-model:selected-area (ListView tabs / GridView card highlight). -->
           <v-menu v-if="computedAreas.length" show-arrow placement="bottom">
-            <template #activator="{ toggle, active }">
+            <template #activator="{ toggle }">
               <v-button
                 secondary
                 small
                 class="area-select"
-                :class="{ 'area-select--open': active }"
                 @click="toggle"
               >
                 <v-icon
@@ -521,11 +520,17 @@ const areaManagerRef = ref<any>(null);
 // stuck to the top (matching Directus' own header-bar). An IntersectionObserver
 // on a sentinel just above the toolbar flips `toolbarStuck`.
 const toolbarSentinel = ref<HTMLElement | null>(null);
+const toolbarEl = ref<HTMLElement | null>(null);
 const toolbarStuck = ref(false);
 let toolbarObserver: IntersectionObserver | null = null;
 
 watch(toolbarSentinel, (el) => {
-  if (!el || toolbarObserver) return;
+  // Re-create the observer whenever the sentinel node changes — the main
+  // interface can be re-rendered across loading/setup/error states, so we must
+  // not keep an observer bound to a detached node (the shadow would stop working).
+  toolbarObserver?.disconnect();
+  toolbarObserver = null;
+  if (!el) return;
   const headerHeight = parseInt(
     getComputedStyle(document.documentElement).getPropertyValue('--header-bar-height'),
     10,
@@ -537,9 +542,18 @@ watch(toolbarSentinel, (el) => {
   toolbarObserver.observe(el);
 });
 
+// Expose the real toolbar height as a CSS variable so the grid's "jump to area"
+// scroll-margin lands just below it without a hardcoded magic number.
+watch(toolbarEl, (el) => {
+  if (el) {
+    document.documentElement.style.setProperty('--lb-toolbar-height', `${el.offsetHeight}px`);
+  }
+});
+
 onUnmounted(() => {
   toolbarObserver?.disconnect();
   toolbarObserver = null;
+  document.documentElement.style.removeProperty('--lb-toolbar-height');
 });
 
 // Computed property for current collection fields
@@ -1824,11 +1838,11 @@ watch(() => props.value, () => {
   padding: var(--theme--form--field--input--padding, 12px) 0;
   border-bottom: var(--theme--border-width) solid var(--theme--border-color);
   flex-shrink: 0;
-  /* Sticky so the view toggle and area selector stay reachable while scrolling.
-     It also keeps the selector's v-menu activator in view, so the focus-return
-     on menu close no longer scrolls the page back to the top — letting "jump to
-     area" work with a plain scrollIntoView (no timing hack). Pinned below
-     Directus' own sticky header-bar via its --header-bar-height variable. */
+  /* Sticky so the view toggle and area selector stay reachable while scrolling,
+     and to show a subtle shadow once stuck (like Directus' own header-bar).
+     Pinned below Directus' own sticky header-bar via its --header-bar-height
+     variable. Note: sticking does NOT cancel the v-menu's focus-return scroll,
+     so the grid's "jump to area" still defers its scroll (see GridView). */
   position: sticky;
   top: var(--header-bar-height, 61px);
   z-index: 2;

@@ -506,8 +506,9 @@ function handleAddBlock(areaId: string) {
   margin-bottom: 0px; /* For wrapping */
   position: relative;
   /* Offset the "jump to area" scroll target below both sticky bars: Directus'
-     header-bar (--header-bar-height) + our own toolbar (~78px) + a small gap. */
-  scroll-margin-top: calc(var(--header-bar-height, 61px) + 88px);
+     header-bar (--header-bar-height) + our own toolbar (--lb-toolbar-height, set
+     from its measured height in interface.vue) + a small gap. */
+  scroll-margin-top: calc(var(--header-bar-height, 61px) + var(--lb-toolbar-height, 78px) + 8px);
 
   &:hover {
     border-color: var(--theme--border-color-accent);
