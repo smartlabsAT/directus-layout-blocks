@@ -128,6 +128,18 @@
         </div>
 
         <div class="toolbar-right">
+          <!-- Guided "add a block" entry point (opens the BlockCreator wizard).
+               Always reachable, unlike the per-area quick-add which only the
+               area headers / empty states expose; preselects the current area. -->
+          <v-button
+            v-if="permissions.create"
+            small
+            secondary
+            @click="openBlockCreator(selectedArea ?? undefined)"
+          >
+            <v-icon name="add" left />
+            Add block
+          </v-button>
           <div class="lb-view-toggle" role="radiogroup" aria-label="View mode">
             <v-button
               v-tooltip="'Grid view'"
@@ -1876,7 +1888,6 @@ watch(() => props.value, () => {
   align-items: center;
   justify-content: space-between;
   padding: var(--theme--form--field--input--padding, 12px) 0;
-  border-bottom: var(--theme--border-width) solid var(--theme--border-color);
   flex-shrink: 0;
   /* Sticky so the view toggle and area selector stay reachable while scrolling,
      and to show a subtle shadow once stuck (like Directus' own header-bar).
@@ -1889,8 +1900,11 @@ watch(() => props.value, () => {
   background: var(--theme--background);
   transition: box-shadow 0.2s;
 
-  /* Subtle elevation once stuck, matching Directus' own header-bar shadow. */
+  /* Separation only once stuck (border + subtle elevation, like Directus' own
+     header-bar). At rest the toolbar blends into the page — no bottom line/shadow,
+     which otherwise reads as a stray drop-shadow when nothing is scrolled under it. */
   &.is-stuck {
+    border-bottom: var(--theme--border-width) solid var(--theme--border-color);
     box-shadow: var(--theme--header--box-shadow);
   }
 
