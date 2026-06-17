@@ -38,7 +38,19 @@
                   </td>
 
                   <td class="icon-cell">
-                    <v-menu v-if="!area.locked" show-arrow placement="bottom">
+                    <!-- Curated icon picker: a compact v-button trigger opens a
+                         v-icon grid (AREA_ICON_CHOICES). Chosen over the native
+                         interface-select-icon, whose teleported, full-width,
+                         virtual-scrolled menu does not fit this table cell (#64).
+                         Uncontrolled v-menu (activator `toggle`) + v-list-item —
+                         the same proven pattern as the allowed-collections menu
+                         below; the menu closes itself on item click. Locked rows
+                         show a static icon (no editing). -->
+                    <v-menu
+                      v-if="!area.locked"
+                      show-arrow
+                      placement="bottom-start"
+                    >
                       <template #activator="{ toggle, active }">
                         <v-button
                           icon
@@ -49,7 +61,20 @@
                           <v-icon :name="area.icon || 'dashboard_customize'" />
                         </v-button>
                       </template>
-                      <icon-picker v-model="area.icon" />
+                      <v-list class="icon-picker-grid">
+                        <v-list-item
+                          v-for="choice in AREA_ICON_CHOICES"
+                          :key="choice"
+                          clickable
+                          :active="(area.icon || 'dashboard_customize') === choice"
+                          class="icon-choice"
+                          v-tooltip="choice"
+                          :aria-label="choice"
+                          @click="pickAreaIcon(area, choice)"
+                        >
+                          <v-icon :name="choice" />
+                        </v-list-item>
+                      </v-list>
                     </v-menu>
                     <v-icon
                       v-else
@@ -301,7 +326,7 @@ import EmptyState from './EmptyState.vue';
 import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
 import type { AreaConfig } from '../types';
-import { WIDTH_OPTIONS } from '../utils/constants';
+import { WIDTH_OPTIONS, AREA_ICON_CHOICES } from '../utils/constants';
 import { validateAreaConfig, sanitizeAreaId } from '../utils/validators';
 
 // Props
@@ -374,6 +399,13 @@ function addArea() {
 function removeArea(index: number) {
   localAreas.value.splice(index, 1);
   validateAreas();
+}
+
+// Picks an area's icon from the curated grid. Like the inline-edit mutators, this
+// edits the local working copy; the parent only receives it on "Save Areas". The
+// v-menu closes itself when a v-list-item is clicked (Directus default).
+function pickAreaIcon(area: AreaConfig, icon: string) {
+  area.icon = icon;
 }
 
 function validateAreas() {
@@ -593,18 +625,6 @@ function save() {
   }
 }
 
-// Icon picker placeholder — the real picker is a separate follow-up (#64).
-// Friendly "coming soon" copy instead of a dev "not implemented" string.
-const IconPicker = {
-  template: `
-    <div class="icon-picker">
-      <p style="padding: var(--theme--form--field--input--padding, 12px); color: var(--theme--foreground-subdued); white-space: nowrap;">
-        Custom icon picker coming soon
-      </p>
-    </div>
-  `
-};
-
 // Expose for parent
 defineExpose({
   save,
@@ -701,6 +721,35 @@ defineExpose({
       }
     }
   }
+}
+
+/* Curated icon picker grid (issue #64). Uses native v-list-item — the proven
+   clickable-menu pattern already used for the allowed-collections menu in this
+   component (raw <button>s inside the teleported v-menu content do not receive
+   clicks). The v-list / v-list-item roots carry the AreaManager scope id even
+   though v-menu teleports the content, so scoped :deep styles reach them — no
+   global leak. v-list-item provides native hover/active styling (active = the
+   currently selected icon). */
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.icon-picker-grid :deep(.icon-choice) {
+  min-width: 0;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--theme--border-radius);
 }
 
 .drag-handle {

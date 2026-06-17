@@ -81,3 +81,16 @@ export const WIDTH_OPTIONS = [
   { text: 'Two Thirds (66%)', value: 66 },
   { text: 'Three Quarters (75%)', value: 75 }
 ];
+
+// Curated icon choices for the AreaManager icon picker — a bounded, layout/section
+// focused set (Material Symbols) rendered as a v-icon grid. Chosen over the native
+// `interface-select-icon` interface, whose teleported, full-width, virtual-scrolled
+// menu does not fit a compact table cell (issue #64). Includes the icons used by the
+// default/locked areas so existing values are always representable in the grid.
+export const AREA_ICON_CHOICES = [
+  'dashboard', 'dashboard_customize', 'grid_view', 'view_quilt', 'view_column', 'view_agenda',
+  'view_day', 'view_carousel', 'view_sidebar', 'vertical_split', 'horizontal_split', 'web',
+  'horizontal_rule', 'table_rows', 'calendar_view_day', 'vertical_align_top', 'vertical_align_bottom',
+  'west', 'east', 'inbox', 'title', 'text_fields', 'image', 'smart_button',
+  'ads_click', 'video_library', 'segment', 'star'
+];
