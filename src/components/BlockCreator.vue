@@ -455,6 +455,24 @@ watch(() => props.selectedArea, (newArea) => {
   if (newArea) localArea.value = newArea;
 });
 
+/* The ItemSelector drawer opens from INSIDE the wizard v-dialog. Directus dialogs
+   (z-index 850) stack above drawers (500), so the drawer would render BEHIND the
+   wizard and be unusable. Scoped CSS can't reach it (it teleports to <body>) and a
+   wrapper class doesn't help (v-drawer re-teleports its container out of the
+   wrapper) — so raise the just-opened drawer's container above the dialog
+   imperatively. Only the wizard's own drawer is open during this flow, so this
+   targets the right one; the inline style dies with the element on close. */
+const DRAWER_ABOVE_DIALOG_Z = '900';
+watch(showItemSelector, (open) => {
+  if (!open) return;
+  nextTick(() => {
+    const container = document.querySelector('.v-drawer')?.closest('.container');
+    if (container instanceof HTMLElement) {
+      container.style.zIndex = DRAWER_ABOVE_DIALOG_Z;
+    }
+  });
+});
+
 // Focus the first sensible control when the dialog opens (a11y §2). The card is
 // teleported to <body> by v-dialog, so query it there; best-effort (native
 // focus-trap keeps focus inside the dialog regardless).
@@ -501,7 +519,7 @@ onMounted(() => {
 .wizard-step-num {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: var(--theme--border-radius);
   background: var(--theme--background-normal);
   display: flex;
   align-items: center;
