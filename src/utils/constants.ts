@@ -43,16 +43,34 @@ export const STATUS_OPTIONS = [
   { text: 'Archived', value: 'archived' }
 ];
 
-// Icon mapping for different collection types
-export const COLLECTION_ICONS: Record<string, string> = {
-  content_headline: 'title',
-  content_text: 'text_fields',
-  content_image: 'image',
-  content_video: 'videocam',
-  content_hero: 'landscape',
-  content_cta: 'ads_click',
-  content_accordion: 'expand_more'
+export interface CollectionMeta {
+  icon: string;
+  label: string;
+  description: string;
+  quickFields?: string[];
+}
+
+// Single source of truth for collection display metadata (icon/label/description/quick-create
+// fields). This is the UNION of every collection key used across the extension — every key that
+// getBlockIcon historically resolved (incl. content_hero/content_accordion) MUST stay here, or the
+// block icons in the already-shipped GridView/ListView would regress to the generic fallback.
+export const COLLECTION_META: Record<string, CollectionMeta> = {
+  content_headline: { icon: 'title', label: 'Headline', description: 'Title or heading text', quickFields: ['headline', 'subheadline'] },
+  content_text: { icon: 'text_fields', label: 'Text Block', description: 'Rich text content', quickFields: ['title', 'content'] },
+  content_image: { icon: 'image', label: 'Image', description: 'Image with caption', quickFields: ['title', 'alt_text'] },
+  content_video: { icon: 'videocam', label: 'Video', description: 'Embedded video', quickFields: ['title', 'video_url'] },
+  content_cta: { icon: 'ads_click', label: 'Call to Action', description: 'Button or action link', quickFields: ['title', 'button_text', 'button_link'] },
+  content_button: { icon: 'smart_button', label: 'Button', description: 'Simple button element', quickFields: ['button_text', 'button_link'] },
+  content_wysiwig: { icon: 'edit_note', label: 'Rich Text', description: 'WYSIWYG editor content', quickFields: ['content'] },
+  content_block: { icon: 'widgets', label: 'Generic Block', description: 'Flexible content block', quickFields: ['title', 'content'] },
+  content_hero: { icon: 'landscape', label: 'Hero', description: 'Hero banner section' },
+  content_accordion: { icon: 'expand_more', label: 'Accordion', description: 'Collapsible content section' }
 };
+
+// Icon mapping derived from COLLECTION_META — kept as a named export for backward compatibility.
+export const COLLECTION_ICONS: Record<string, string> = Object.fromEntries(
+  Object.entries(COLLECTION_META).map(([key, meta]) => [key, meta.icon])
+);
 
 // Width options for areas
 export const WIDTH_OPTIONS = [

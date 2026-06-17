@@ -1,9 +1,10 @@
 <template>
-  <div class="layout-blocks-grid-view" :class="{ 'compact': options.compactMode }">
+  <div ref="rootEl" class="layout-blocks-grid-view" :class="{ 'compact': options.compactMode }">
     <div class="grid-container">
       <div
         v-for="area in visibleAreas"
         :key="area.id"
+        :data-area-id="area.id"
         class="grid-area"
         :class="{
           'selected': selectedArea === area.id,
@@ -12,7 +13,12 @@
           'drag-over': dragOverArea === area.id
         }"
         :style="getAreaStyle(area)"
+        role="group"
+        :aria-label="area.label"
+        tabindex="0"
         @click="selectArea(area.id)"
+        @keydown.self.enter.prevent.stop="selectArea(area.id)"
+        @keydown.self.space.prevent.stop="selectArea(area.id)"
         @dragover="handleDragOver($event, area)"
         @drop="handleDrop($event, area)"
         @dragleave="handleDragLeave"
@@ -41,11 +47,21 @@
 
         <!-- Area Content -->
         <div class="area-content">
+          <!-- Loading Skeleton (mirrors the list view's per-area loading) -->
+          <div v-if="loading" class="area-skeleton">
+            <v-skeleton-loader
+              v-for="n in SKELETON_ROWS"
+              :key="n"
+              type="block-list-item"
+            />
+          </div>
+
           <transition-group
-            v-if="getAreaBlocks(area.id).length > 0"
+            v-else-if="getAreaBlocks(area.id).length > 0"
             name="block-list"
             tag="div"
             class="blocks-container"
+            role="list"
           >
             <block-item-component
               v-for="(block, index) in getAreaBlocks(area.id)"
@@ -56,6 +72,7 @@
               :compact="options.compactMode"
               :permissions="permissions"
               :draggable="options.enableDragDrop && (!area.locked || area.id === 'orphaned')"
+              :grabbed="isBlockGrabbed(block.id)"
               @edit="$emit('update-block', { blockId: block.id })"
               @remove="$emit('remove-block', block.id)"
               @unlink="$emit('unlink-block', block.id)"
@@ -64,30 +81,35 @@
               @update-status="handleBlockStatusUpdate(block, $event)"
               @dragstart="handleDragStart($event, block, area)"
               @dragend="handleDragEnd"
+              @keydown="handleBlockKeydown($event, block)"
             />
           </transition-group>
 
-          <!-- Empty State -->
-          <div v-else class="area-empty">
-            <v-icon name="inbox" large color="--foreground-subdued" />
-            <p>{{ area.locked ? 'Area is locked' : 'No blocks in this area' }}</p>
-            <AddBlockDropdown
-              v-if="!area.locked && permissions.create"
-              :area="area.id"
-              :allowed-collections="allowedCollections"
-              size="small"
-              variant="secondary"
-              @create-block="$emit('create-quick', $event)"
-              @open-selector="$emit('open-selector', $event)"
-            />
-          </div>
+          <!-- Empty State (shared EmptyState, dense for the constrained area card) -->
+          <EmptyState
+            v-else
+            dense
+            icon="inbox"
+            :message="area.locked ? 'Area is locked' : 'No blocks in this area'"
+          >
+            <template v-if="!area.locked && permissions.create" #action>
+              <AddBlockDropdown
+                :area="area.id"
+                :allowed-collections="allowedCollections"
+                size="small"
+                variant="secondary"
+                @create-block="$emit('create-quick', $event)"
+                @open-selector="$emit('open-selector', $event)"
+              />
+            </template>
+          </EmptyState>
         </div>
 
         <!-- Area Footer -->
         <div v-if="area.maxItems" class="area-footer">
           <v-progress-linear
-            :model-value="getAreaProgress(area)"
-            :color="getAreaProgress(area) >= 100 ? 'danger' : 'primary'"
+            :value="getAreaProgress(area)"
+            :style="{ '--v-progress-linear-color': getAreaProgress(area) >= 100 ? 'var(--theme--danger)' : 'var(--theme--primary)' }"
             rounded
           />
           <span class="area-limit">
@@ -97,12 +119,14 @@
       </div>
     </div>
 
+    <!-- Visually-hidden live region: announces keyboard drag & drop steps. -->
+    <div class="lb-sr-only" role="status" aria-live="polite">{{ kbAnnouncement }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { logger } from '../utils/logger';
-import { ref, computed } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import type {
   BlockItem,
@@ -112,6 +136,9 @@ import type {
   UserPermissions
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
+import EmptyState from './EmptyState.vue';
+import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
+import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 
 // Props
 interface Props {
@@ -125,6 +152,30 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Number of skeleton placeholders shown per area while blocks are loading.
+const SKELETON_ROWS = 3;
+
+// Root element, used to scope the "jump to area" scroll lookup.
+const rootEl = ref<HTMLElement | null>(null);
+
+// Delay before the "jump to area" scroll. The toolbar area selector is a v-menu;
+// selecting an item closes it and returns focus to the activator, which makes the
+// browser briefly scroll the page back up. Deferring past that focus-return lets
+// the jump stick. (The sticky toolbar keeps the selector reachable, but does not
+// by itself cancel the focus-return scroll.)
+const AREA_JUMP_SCROLL_DELAY_MS = 300;
+
+// "Jump to area": when an area becomes selected, scroll its card up. block:'start'
+// + the card's scroll-margin-top land it just below the sticky toolbar.
+watch(() => props.selectedArea, (areaId) => {
+  if (!areaId) return;
+  setTimeout(() => {
+    const cards = rootEl.value?.querySelectorAll('[data-area-id]');
+    const el = cards && Array.from(cards).find(c => c.getAttribute('data-area-id') === areaId);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, AREA_JUMP_SCROLL_DELAY_MS);
+});
 
 // Emits
 const emit = defineEmits<{
@@ -156,9 +207,48 @@ const visibleAreas = computed(() => {
     return props.areas;
   }
   
-  return props.areas.filter(area => 
+  return props.areas.filter(area =>
     hasBlocks(area.id) || area.id === props.selectedArea
   );
+});
+
+// Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3) — the focused block card itself
+// is the grab target (no separate handle in the grid). Reuses the very same
+// canDropInArea predicate as the pointer path so the rules stay identical.
+/* Just past the .block-list leave/move transition (0.3s, see <style>). After a
+   cross-area move the LEAVING card lingers in its old area's transition-group
+   for that long and steals focus back to <body> when it is finally removed — so
+   besides the immediate attempt we re-assert focus once the transition settled. */
+const FOCUS_SETTLE_MS = 380;
+
+function focusBlock(blockId: BlockId): void {
+  /* During the leave/enter transition there can briefly be TWO [data-block-id]
+     nodes (leaving ghost + entering card). Focus the one that is NOT leaving. */
+  const focusNonLeaving = () => {
+    const nodes = rootEl.value?.querySelectorAll(`[data-block-id="${CSS.escape(String(blockId))}"]`);
+    const el = nodes && (Array.from(nodes).find((n) =>
+      !n.classList.contains('block-list-leave-active') &&
+      !n.classList.contains('block-list-leave-to')
+    ) as HTMLElement | undefined);
+    el?.focus();
+  };
+  nextTick(focusNonLeaving);          /* fast path (within-area moves) */
+  setTimeout(focusNonLeaving, FOCUS_SETTLE_MS);  /* re-assert after the transition settles */
+}
+
+const {
+  announcement: kbAnnouncement,
+  isGrabbed: isBlockGrabbed,
+  handleBlockKeydown,
+} = useKeyboardDnd({
+  areas: visibleAreas,
+  getAreaBlocks,
+  canDrop: canDropInArea,
+  emitMove: (payload) => emit('move-block', payload),
+  enabled: () => !!props.options.enableDragDrop,
+  getTitle: (block) => getBlockTitle(block),
+  focusBlock,
+  navOrder: () => visibleAreas.value.flatMap((a) => getAreaBlocks(a.id).map((b) => b.id)),
 });
 
 // Methods
@@ -259,86 +349,17 @@ function handleDragStart(event: DragEvent, block: BlockItem, area: AreaConfig) {
   // Add dragging class to body for global styles
   document.body.classList.add('dragging-block');
   
-  // Create custom drag image
-  const dragImage = createDragImage(block);
+  // Create custom drag image (clone the rendered collection icon so the glyph shows)
+  const sourceIcon = document.querySelector(
+    `.block-item[data-block-id=${CSS.escape(String(block.id))}] .block-icon .v-icon`
+  );
+  const dragImage = createDragImage(block, sourceIcon);
   event.dataTransfer!.setDragImage(dragImage, 10, 10);
   
   // Remove the drag image after a short delay
   setTimeout(() => {
     dragImage.remove();
   }, 0);
-}
-
-function createDragImage(block: BlockItem): HTMLElement {
-  const dragImage = document.createElement('div');
-  dragImage.style.cssText = `
-    position: absolute;
-    top: -1000px;
-    left: -1000px;
-    background: var(--background-page);
-    border: 2px solid var(--primary);
-    border-radius: var(--border-radius);
-    padding: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    font-family: var(--font-family);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
-    z-index: 9999;
-    pointer-events: none;
-  `;
-  
-  // Add header with icon
-  const header = document.createElement('div');
-  header.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--foreground-normal);
-  `;
-  
-  const icon = document.createElement('span');
-  icon.innerHTML = '📦';
-  header.appendChild(icon);
-  
-  const title = document.createElement('span');
-  title.textContent = getBlockTitle(block);
-  header.appendChild(title);
-  
-  dragImage.appendChild(header);
-  
-  // Add collection type
-  const meta = document.createElement('div');
-  meta.style.cssText = `
-    font-size: 12px;
-    color: var(--foreground-subdued);
-  `;
-  meta.textContent = getCollectionLabel(block);
-  dragImage.appendChild(meta);
-  
-  document.body.appendChild(dragImage);
-  return dragImage;
-}
-
-function getBlockTitle(block: BlockItem): string {
-  const item = block.item;
-  if (!item) return `Block #${block.id}`;
-
-  return item.title || 
-         item.name || 
-         item.headline || 
-         item.label ||
-         `${getCollectionLabel(block)} #${block.id}`;
-}
-
-function getCollectionLabel(block: BlockItem): string {
-  return block.collection
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase())
-    .replace(/^Content /, '');
 }
 
 function handleDragEnd(event: DragEvent) {
@@ -399,6 +420,18 @@ function handleDragOver(event: DragEvent, area: AreaConfig) {
 
 function handleDragLeave(event: DragEvent) {
   const areaElement = event.currentTarget as HTMLElement;
+  // dragleave also fires when the pointer moves onto a child element (a block, the
+  // header). Only clear the drag state when the pointer is actually outside the area
+  // bounds — otherwise .drag-over rapidly toggles and the drop-zone highlight
+  // flickers as the cursor moves over the blocks inside the area. (relatedTarget is
+  // unreliable during native DnD, so check the pointer position against the rect.)
+  const rect = areaElement.getBoundingClientRect();
+  if (
+    event.clientX >= rect.left && event.clientX <= rect.right &&
+    event.clientY >= rect.top && event.clientY <= rect.bottom
+  ) {
+    return;
+  }
   areaElement.classList.remove('drag-not-allowed');
   areaElement.classList.remove('drag-over');
   dragOverArea.value = null;
@@ -449,7 +482,14 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   if (area.id === 'orphaned') {
     return false;
   }
-  
+
+  // Locked areas are not valid drop targets. ListView already enforced this;
+  // GridView's pointer handlers checked it separately, but folding it in here
+  // keeps a single source of truth that the keyboard DnD engine reuses too.
+  if (area.locked) {
+    return false;
+  }
+
   // Check max items
   if (area.maxItems) {
     const currentCount = getAreaBlocks(area.id).length;
@@ -481,6 +521,8 @@ function handleAddBlock(areaId: string) {
 </script>
 
 <style lang="scss" scoped>
+@use '../styles/theme' as theme;
+
 .layout-blocks-grid-view {
   height: 100%;
   display: flex;
@@ -514,9 +556,7 @@ function handleAddBlock(areaId: string) {
 }
 
 .grid-area {
-  background: var(--background-subdued);
-  border: 1px solid black; /* Always visible subtle border */
-  border-radius: var(--border-radius);
+  @include theme.recessed-surface; /* bg-subdued + 1px token border + radius (replaces the old hardcoded black border) */
   display: flex;
   flex-direction: column;
   min-height: 200px;
@@ -527,20 +567,24 @@ function handleAddBlock(areaId: string) {
   box-sizing: border-box;
   margin-bottom: 0px; /* For wrapping */
   position: relative;
-  outline: 1px solid var(--border-subdued); /* Double border effect */
-  outline-offset: -2px;
+  /* Offset the "jump to area" scroll target below both sticky bars: Directus'
+     header-bar (--header-bar-height) + our own toolbar (--lb-toolbar-height, set
+     from its measured height in interface.vue) + a small gap. */
+  scroll-margin-top: calc(var(--header-bar-height, 61px) + var(--lb-toolbar-height, 78px) + 8px);
 
   &:hover {
-    border-color: var(--border-normal);
-    background: var(--background-normal);
-    outline-color: var(--border-normal);
+    border-color: var(--theme--border-color-accent);
+  }
+
+  /* Keyboard focus ring (a11y §1) — keyboard-only via :focus-visible. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--primary);
+    outline-offset: 2px;
   }
 
   &.selected {
-    border-color: var(--primary);
-    outline-color: var(--primary);
-    outline-width: 2px;
-    background: var(--primary-10);
+    border-color: var(--theme--primary);
+    background: var(--theme--primary-background);
   }
 
   &.locked {
@@ -549,27 +593,22 @@ function handleAddBlock(areaId: string) {
   }
 
   &.drag-over {
-    border-color: var(--primary);
-    outline-color: var(--primary-50);
-    outline-width: 2px;
-    background: var(--primary-alt);
+    @include theme.drop-zone-valid;
   }
 
   &.empty:not(.drag-over) {
     .area-content {
       opacity: 0.7;
     }
-    
+
     .empty-state {
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 
   &.drag-not-allowed {
+    @include theme.drop-zone-invalid;
     cursor: not-allowed;
-    background: var(--danger-10);
-    border-color: var(--danger);
-    outline-color: var(--danger);
     opacity: 0.7;
   }
 }
@@ -580,23 +619,22 @@ function handleAddBlock(areaId: string) {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 2px solid var(--border-normal);
-  background: var(--background-normal-alt);
-  border-radius: calc(var(--border-radius) - 2px) calc(var(--border-radius) - 2px) 0 0;
+  border-bottom: var(--theme--border-width) solid var(--theme--border-color);
+  background: var(--theme--background-accent);
+  border-radius: var(--theme--border-radius) var(--theme--border-radius) 0 0;
   min-height: 48px;
 
   .area-title {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: var(--theme--fonts--title--font-family);
     font-weight: 600;
     font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--foreground-normal);
-    
+    color: var(--theme--foreground-accent);
+
     .v-icon {
-      color: var(--foreground-subdued);
+      color: var(--theme--foreground-subdued);
     }
   }
 
@@ -614,40 +652,38 @@ function handleAddBlock(areaId: string) {
   overflow-x: hidden;
 }
 
+.area-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
 .blocks-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.area-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 120px;
-  text-align: center;
-  color: var(--foreground-subdued);
-
-  p {
-    margin: 8px 0 16px;
-    font-size: 14px;
-  }
-}
-
 .area-footer {
   padding: 8px 12px;
-  border-top: 1px solid var(--border-subdued);
+  border-top: var(--theme--border-width) solid var(--theme--border-color-subdued);
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--background-normal);
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  background: var(--theme--background-normal);
+  border-radius: 0 0 var(--theme--border-radius) var(--theme--border-radius);
+
+  .v-progress-linear {
+    flex: 1;
+  }
 
   .area-limit {
+    flex-shrink: 0;
+    white-space: nowrap;
     font-size: 12px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -692,23 +728,37 @@ function handleAddBlock(areaId: string) {
 :deep(.sortable-drag) {
   opacity: 0;
 }
-</style>
 
-<style lang="scss">
-// Global styles for drag state.
-// The drop hint is drawn as an absolutely-positioned overlay rather than a
-// border, so it never changes the header box height. A border would reflow the
-// content below it, and since drag-over toggles continuously while the pointer
-// moves, that made the blocks jump by the border width.
-body.dragging-block {
-  .grid-area:not(.drag-over) .area-header::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-bottom: 2px dashed var(--primary);
-    pointer-events: none;
+/* Visually-hidden live region (a11y §3): off-screen but readable by AT. */
+.lb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion (a11y §5): drop entrance/move/drag animations; keep function. */
+@media (prefers-reduced-motion: reduce) {
+  .grid-area {
+    transition: none;
+  }
+
+  .block-list-move,
+  .block-list-enter-active,
+  .block-list-leave-active,
+  .slide-enter-active,
+  .slide-leave-active {
+    transition: none;
+  }
+
+  .block-list-enter-from,
+  .block-list-leave-to {
+    transform: none;
   }
 }
 </style>

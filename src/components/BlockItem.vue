@@ -4,10 +4,13 @@
     :class="{
       'compact': compact,
       'draggable': draggable,
-      'selected': isSelected
+      'dragging': grabbed
     }"
     :data-block-id="block.id"
     :draggable="draggable"
+    role="listitem"
+    tabindex="0"
+    :aria-roledescription="draggable ? 'sortable' : undefined"
     v-bind="$attrs"
     @click.stop="handleClick"
     @dblclick="handleDoubleClick"
@@ -46,9 +49,10 @@
         show-arrow
         placement="bottom-end"
       >
-        <template #activator="{ toggle }">
+        <template #activator="{ toggle, active }">
           <v-button
             v-tooltip="'Options'"
+            v-btn-aria="{ 'aria-label': 'Block options', 'aria-haspopup': 'menu', 'aria-expanded': active }"
             icon
             x-small
             secondary
@@ -92,8 +96,8 @@
               <v-icon name="link_off" />
             </v-list-item-icon>
             <v-list-item-content>
-              <div>Unassign</div>
-              <div class="list-item-subtitle">Remove from this page only</div>
+              <div>Unassign from this page</div>
+              <div class="list-item-subtitle">The item stays in its collection and on other pages</div>
             </v-list-item-content>
           </v-list-item>
 
@@ -107,8 +111,8 @@
               <v-icon name="delete" />
             </v-list-item-icon>
             <v-list-item-content>
-              <div>Delete Everywhere</div>
-              <div class="list-item-subtitle">Delete item and all references</div>
+              <div>Delete everywhere</div>
+              <div class="list-item-subtitle">Permanently delete the item and all references</div>
             </v-list-item-content>
           </v-list-item>
         </v-list>
@@ -129,6 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { vBtnAria } from '../directives/btnAria';
 import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
 import StatusSelector from './StatusSelector.vue';
@@ -148,13 +153,14 @@ interface Props {
   compact?: boolean;
   permissions: UserPermissions;
   draggable?: boolean;
-  selected?: boolean;
+  /** True while this block is held in keyboard drag mode (a11y §3). */
+  grabbed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   compact: false,
   draggable: true,
-  selected: false
+  grabbed: false
 });
 
 // Emits
@@ -169,7 +175,6 @@ const emit = defineEmits<{
 }>();
 
 // State
-const isSelected = ref(props.selected);
 const showDeleteDialog = ref(false);
 const deleteLoading = ref(false);
 
@@ -188,11 +193,10 @@ const canDeleteContent = computed(() => {
 // Methods
 function getBlockColor(): string {
   // You can implement custom color logic here
-  return '--foreground-normal';
+  return 'var(--theme--foreground)';
 }
 
 function handleClick() {
-  isSelected.value = !isSelected.value;
   emit('click');
 }
 
@@ -223,26 +227,38 @@ function updateStatus(status: string) {
 </script>
 
 <style lang="scss" scoped>
+/* Card-surface + interactive-state values are inlined here (not via the shared
+   _theme.scss mixins) on purpose. In this extension's build
+   (`directus-extension build`), a rule whose declarations come from an SCSS
+   `@include` compiles to an UN-scoped global selector (verified: GridView's
+   `@include theme.recessed-surface` emits a global `.grid-area {}` in dist).
+   That is harmless for unique class names, but `.block-item` collides with the
+   sibling `expandable-blocks` extension's own global `.block-item` rules (legacy
+   vars, some `!important`) that would otherwise wipe the card border/background.
+   Inlining keeps these declarations scoped (`[data-v]`) so they out-specify the
+   sibling. Trade-off: the values duplicate #48's card-surface / interactive-
+   states mixins — keep them in sync if those tokens change. */
 .block-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: var(--background-normal);
-  border: 1px solid var(--border-normal);
-  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  background: var(--theme--background);
+  border: var(--theme--border-width) solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
   transition: all 0.2s;
   cursor: pointer;
   user-select: none;
 
   &:hover {
-    border-color: var(--border-normal-alt);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-color: var(--theme--border-color-accent);
+    background: var(--theme--background-normal);
   }
 
-  &.selected {
-    border-color: var(--primary);
-    background: var(--primary-alt);
+  /* Keyboard focus ring (a11y §1) — keyboard-only via :focus-visible. */
+  &:focus-visible {
+    outline: 2px solid var(--theme--primary);
+    outline-offset: 2px;
   }
 
   &.draggable {
@@ -250,21 +266,23 @@ function updateStatus(status: string) {
   }
 
   &.compact {
-    padding: 8px;
+    padding: 0.5rem;
 
     .block-content {
       .block-title {
         font-size: 13px;
       }
     }
+
+    .block-icon {
+      width: 32px;
+      height: 32px;
+    }
   }
-  
+
   &.dragging {
     opacity: 0.5;
-    background-color: var(--primary-25);
-    border-color: var(--primary);
-    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.2);
-    transform: scale(0.98);
+    border-style: dashed;
     cursor: grabbing !important;
   }
 }
@@ -276,8 +294,8 @@ function updateStatus(status: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--background-normal-alt);
-  border-radius: var(--border-radius);
+  background: var(--theme--background-normal);
+  border-radius: var(--theme--border-radius);
 }
 
 .block-content {
@@ -285,8 +303,9 @@ function updateStatus(status: string) {
   min-width: 0;
 
   .block-title {
+    font-family: var(--theme--fonts--title--font-family);
     font-weight: 600;
-    color: var(--foreground-normal);
+    color: var(--theme--foreground-accent);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -294,7 +313,7 @@ function updateStatus(status: string) {
 
   .block-subtitle {
     font-size: 13px;
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -316,9 +335,9 @@ function updateStatus(status: string) {
 }
 
 :deep(.v-list-item.danger) {
-  --v-list-item-color: var(--danger);
-  --v-list-item-color-hover: var(--danger);
-  --v-list-item-icon-color: var(--danger);
+  --v-list-item-color: var(--theme--danger);
+  --v-list-item-color-hover: var(--theme--danger);
+  --v-list-item-icon-color: var(--theme--danger);
 }
 
 :deep(.v-list) {
@@ -332,7 +351,14 @@ function updateStatus(status: string) {
 
 .list-item-subtitle {
   font-size: 12px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
   margin-top: 2px;
+}
+
+/* Reduced motion (a11y §5): no card transitions when the user opts out. */
+@media (prefers-reduced-motion: reduce) {
+  .block-item {
+    transition: none;
+  }
 }
 </style>

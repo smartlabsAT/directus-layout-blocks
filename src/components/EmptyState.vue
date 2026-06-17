@@ -1,15 +1,18 @@
 <template>
-  <div class="empty-state">
+  <div class="empty-state" :class="{ dense }">
     <v-icon :name="icon" large />
     <p>{{ message }}</p>
-    <v-button
-      v-if="showAction && actionLabel"
-      :small="small"
-      :secondary="secondary"
-      @click="$emit('action')"
-    >
-      {{ actionLabel }}
-    </v-button>
+    <!-- Custom action (e.g. an AddBlockDropdown); falls back to a plain button. -->
+    <slot name="action">
+      <v-button
+        v-if="showAction && actionLabel"
+        :small="small"
+        :secondary="secondary"
+        @click="$emit('action')"
+      >
+        {{ actionLabel }}
+      </v-button>
+    </slot>
   </div>
 </template>
 
@@ -21,13 +24,16 @@ interface Props {
   actionLabel?: string;
   small?: boolean;
   secondary?: boolean;
+  /** Tighter padding/min-height for constrained contexts (e.g. a grid area card). */
+  dense?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
   icon: 'inbox',
   showAction: false,
   small: false,
-  secondary: false
+  secondary: false,
+  dense: false
 });
 
 defineEmits<{
@@ -43,9 +49,15 @@ defineEmits<{
   justify-content: center;
   gap: 16px;
   padding: 40px;
-  color: var(--foreground-subdued);
+  color: var(--theme--foreground-subdued);
   text-align: center;
   min-height: 200px;
+
+  &.dense {
+    gap: 12px;
+    padding: 16px;
+    min-height: 120px;
+  }
 
   p {
     margin: 0;
@@ -53,7 +65,7 @@ defineEmits<{
   }
 
   .v-icon {
-    color: var(--foreground-subdued);
+    color: var(--theme--foreground-subdued);
   }
 }
 </style>
