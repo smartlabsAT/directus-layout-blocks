@@ -339,7 +339,7 @@ import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { useBlockPermissions } from './composables/useBlockPermissions';
 import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
-import { normalizeAreaIds, isTempId } from './utils/helpers';
+import { normalizeAreaIds, isTempId, formatCollectionName } from './utils/helpers';
 import { cloneDeep } from 'lodash-es';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type {
@@ -745,32 +745,38 @@ const allowedCollections = computed(() => {
   return null;
 });
 
-// Format allowed collections for the AreaManager
+// Build a { text, value } option for the AreaManager collection picker, reusing
+// the Directus collection display name (falls back to a prettified key).
+function formatCollectionOption(collectionName: string): { text: string; value: string } {
+  return {
+    text: collectionsStore.getCollection(collectionName)?.name || formatCollectionName(collectionName),
+    value: collectionName
+  };
+}
+
+// Format allowed collections for the AreaManager.
 const formattedAllowedCollections = computed(() => {
-  // Get the allowed collections from the computed property
   const allowed = allowedCollections.value;
-  
-  // If no collections are allowed, return empty array
-  if (!allowed || allowed.length === 0) {
-    return [];
+
+  // Restricted: the field/interface limits the M2A to an explicit subset — offer
+  // exactly that subset (unchanged behavior).
+  if (allowed && allowed.length > 0) {
+    return allowed.map(formatCollectionOption);
   }
-  
-  // Get collection details from collectionsStore if available
-  const collections = collectionsStore.collections;
-  
-  // Format the collections
-  const formatted = allowed.map(collectionName => {
-    const collection = collections?.[collectionName];
-    return {
-      text: collection?.name || collectionName
-        .split('_')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' '),
-      value: collectionName
-    };
-  });
-  
-  return formatted;
+
+  // Unrestricted (allowedCollections === null): the M2A field accepts any
+  // collection, so list every eligible content collection instead of an empty
+  // array (issue #64). Excludes system collections, schema-less folder/group
+  // pseudo-collections, hidden collections, and the M2A junction itself.
+  const junctionCollection = junctionInfo.value?.collection;
+  return collectionsStore.collections
+    .filter((collection: any) =>
+      !collection.collection.startsWith('directus_') &&
+      collection.schema != null &&
+      collection.meta?.hidden !== true &&
+      collection.collection !== junctionCollection
+    )
+    .map((collection: any) => formatCollectionOption(collection.collection));
 });
 
 // Initialize ItemSelector after allowedCollections is defined
