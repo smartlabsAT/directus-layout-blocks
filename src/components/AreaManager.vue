@@ -275,10 +275,11 @@
           </table>
         </div>
 
-        <div v-else class="empty-state">
-          <v-icon name="dashboard_customize" large />
-          <p>No areas defined yet — use "Add area" to create one.</p>
-        </div>
+        <EmptyState
+          v-else
+          icon="dashboard_customize"
+          message='No areas defined yet — use "Add area" to create one.'
+        />
 
         <!--
           Explains the locked-row treatment (lock icon + disabled inline edit).
@@ -296,6 +297,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { vBtnAria } from '../directives/btnAria';
+import EmptyState from './EmptyState.vue';
 import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
 import type { AreaConfig } from '../types';
@@ -591,12 +593,13 @@ function save() {
   }
 }
 
-// Icon picker placeholder
+// Icon picker placeholder — the real picker is a separate follow-up (#64).
+// Friendly "coming soon" copy instead of a dev "not implemented" string.
 const IconPicker = {
   template: `
     <div class="icon-picker">
-      <p style="padding: 12px; color: var(--theme--foreground-subdued);">
-        Icon picker not implemented
+      <p style="padding: var(--theme--form--field--input--padding, 12px); color: var(--theme--foreground-subdued); white-space: nowrap;">
+        Custom icon picker coming soon
       </p>
     </div>
   `
@@ -771,6 +774,14 @@ defineExpose({
   opacity: 1;
 }
 
+/* Reduced motion (a11y §5): no hover/affordance transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .editable-value,
+  .edit-pencil {
+    transition: none;
+  }
+}
+
 .collections-list {
   display: flex;
   flex-direction: column;
@@ -793,12 +804,6 @@ defineExpose({
   .v-button {
     margin-top: 4px;
   }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  color: var(--theme--foreground-subdued);
 }
 
 .locked-hint {

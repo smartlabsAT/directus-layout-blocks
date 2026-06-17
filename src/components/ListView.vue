@@ -215,7 +215,7 @@
                     x-small
                     secondary
                     class="danger"
-                    @click="confirmRemove(block.id)"
+                    @click="openDeleteDialog(block)"
                   >
                     <v-icon name="delete" />
                   </v-button>
@@ -253,6 +253,15 @@
 
     <!-- Visually-hidden live region: announces keyboard drag & drop steps. -->
     <div class="lb-sr-only" role="status" aria-live="polite">{{ kbAnnouncement }}</div>
+
+    <delete-confirmation-dialog
+      v-model="showDeleteDialog"
+      :block-title="blockToDelete ? getBlockTitle(blockToDelete) : ''"
+      :can-delete="canDeleteContent"
+      :loading="deleteLoading"
+      @confirm="handleDeleteConfirm"
+      @cancel="showDeleteDialog = false"
+    />
   </div>
 </template>
 
@@ -262,6 +271,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import AddBlockDropdown from './AddBlockDropdown.vue';
 import StatusSelector from './StatusSelector.vue';
 import EmptyState from './EmptyState.vue';
+import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
 import { createDragImage } from '../utils/blockHelpers';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 import { vBtnAria } from '../directives/btnAria';
@@ -295,7 +305,8 @@ const emit = defineEmits<{
     toArea: string;
     toIndex: number;
   }];
-  'remove-block': [blockId: BlockId];
+  'unlink-block': [blockId: BlockId];
+  'delete-block': [blockId: BlockId, deleteContent: boolean];
   'duplicate-block': [blockId: BlockId];
   'update-block': [data: { blockId: BlockId; updates?: any }];
   'add-block': [area?: string];
@@ -537,10 +548,34 @@ function getCollectionLabel(block: BlockItem): string {
     .replace(/^Content /, '');
 }
 
-function confirmRemove(blockId: number) {
-  if (confirm('Are you sure you want to remove this block?')) {
-    emit('remove-block', blockId);
+/* Remove uses the redesigned DeleteConfirmationDialog (unassign vs delete),
+   consistent with the grid/block-card path — not a native confirm(). */
+const blockToDelete = ref<BlockItem | null>(null);
+const showDeleteDialog = ref(false);
+const deleteLoading = ref(false);
+
+const canDeleteContent = computed(() =>
+  !!props.permissions.delete && blockToDelete.value?.item != null
+);
+
+function openDeleteDialog(block: BlockItem) {
+  blockToDelete.value = block;
+  showDeleteDialog.value = true;
+}
+
+function handleDeleteConfirm(options: { deleteContent: boolean }) {
+  if (!blockToDelete.value) return;
+  deleteLoading.value = true;
+  if (options.deleteContent) {
+    emit('delete-block', blockToDelete.value.id, true);
+  } else {
+    emit('unlink-block', blockToDelete.value.id);
   }
+  setTimeout(() => {
+    showDeleteDialog.value = false;
+    deleteLoading.value = false;
+    blockToDelete.value = null;
+  }, 100);
 }
 
 function updateBlockStatus(block: BlockItem, newStatus: string) {

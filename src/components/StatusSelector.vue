@@ -93,6 +93,13 @@ defineEmits<{
     color: var(--theme--foreground);
   }
 }
+
+/* Reduced motion (a11y §5): no hover transition. */
+@media (prefers-reduced-motion: reduce) {
+  .status-display {
+    transition: none;
+  }
+}
 </style>
 
 <style lang="scss">
