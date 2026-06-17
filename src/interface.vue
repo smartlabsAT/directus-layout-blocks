@@ -1908,6 +1908,11 @@ watch(() => props.value, () => {
     box-shadow: var(--theme--header--box-shadow);
   }
 
+  /* Reduced motion (a11y §5): no shadow transition. */
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+
   .toolbar-left,
   .toolbar-center,
   .toolbar-right {

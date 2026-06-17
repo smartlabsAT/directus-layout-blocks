@@ -85,20 +85,24 @@
             />
           </transition-group>
 
-          <!-- Empty State -->
-          <div v-else class="area-empty">
-            <v-icon name="inbox" large />
-            <p>{{ area.locked ? 'Area is locked' : 'No blocks in this area' }}</p>
-            <AddBlockDropdown
-              v-if="!area.locked && permissions.create"
-              :area="area.id"
-              :allowed-collections="allowedCollections"
-              size="small"
-              variant="secondary"
-              @create-block="$emit('create-quick', $event)"
-              @open-selector="$emit('open-selector', $event)"
-            />
-          </div>
+          <!-- Empty State (shared EmptyState, dense for the constrained area card) -->
+          <EmptyState
+            v-else
+            dense
+            icon="inbox"
+            :message="area.locked ? 'Area is locked' : 'No blocks in this area'"
+          >
+            <template v-if="!area.locked && permissions.create" #action>
+              <AddBlockDropdown
+                :area="area.id"
+                :allowed-collections="allowedCollections"
+                size="small"
+                variant="secondary"
+                @create-block="$emit('create-quick', $event)"
+                @open-selector="$emit('open-selector', $event)"
+              />
+            </template>
+          </EmptyState>
         </div>
 
         <!-- Area Footer -->
@@ -132,6 +136,7 @@ import type {
   UserPermissions
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
+import EmptyState from './EmptyState.vue';
 import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 
@@ -660,25 +665,9 @@ function handleAddBlock(areaId: string) {
   gap: 8px;
 }
 
-.area-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 120px;
-  text-align: center;
-  color: var(--theme--foreground-subdued);
-
-  p {
-    margin: 8px 0 16px;
-    font-size: 14px;
-  }
-}
-
 .area-footer {
   padding: 8px 12px;
-  border-top: 1px solid var(--theme--border-color-subdued);
+  border-top: var(--theme--border-width) solid var(--theme--border-color-subdued);
   display: flex;
   align-items: center;
   gap: 8px;
