@@ -608,6 +608,9 @@ onUnmounted(() => {
   toolbarObserver?.disconnect();
   toolbarObserver = null;
   document.documentElement.style.removeProperty('--lb-toolbar-height');
+  // Revert the full-width breakout (if any) so we never leave an inline override
+  // on a Directus-owned `.field` after the interface is gone.
+  applyFullWidthBreakout(false);
 });
 
 // Full-width breakout (options.fullWidth): the interface normally renders inside
@@ -628,10 +631,12 @@ function applyFullWidthBreakout(enabled: boolean) {
   // element changed across a re-render) so we never leave an orphaned override.
   if (breakoutField) {
     breakoutField.style.removeProperty('grid-column');
-    breakoutField.style.removeProperty('margin-inline');
     breakoutField = null;
   }
   if (!enabled) return;
+  // Relies on Directus' form-field markup: the interface is wrapped in a `.field`.
+  // If it is absent (e.g. the interface is used outside a form), we simply no-op —
+  // no breakout, no error.
   const field = rootEl.value?.closest('.field') as HTMLElement | null;
   if (!field) return;
   breakoutField = field;
@@ -649,8 +654,6 @@ watch(
   (enabled) => { nextTick(() => applyFullWidthBreakout(!!enabled)); },
   { immediate: true },
 );
-
-onUnmounted(() => applyFullWidthBreakout(false));
 
 // Computed property for current collection fields
 const editingCollectionFields = computed(() => {
