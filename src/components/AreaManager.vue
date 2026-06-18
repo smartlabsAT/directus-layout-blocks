@@ -317,7 +317,7 @@
                       x-small
                       secondary
                       class="danger"
-                      @click="removeArea(index)"
+                      @click="removeArea(area)"
                     >
                       <v-icon name="delete" />
                     </v-button>
@@ -459,28 +459,36 @@ function toggleLock(area: AreaConfig, index: number) {
 
 // --- Area removal with confirmation ----------------------------------------
 // A single shared confirm dialog (rendered once, outside the row loop) is driven
-// by `areaPendingRemoval` (the row index) — never one dialog per row. `removeArea`
-// only opens the dialog; `confirmRemoveArea` performs the splice.
-const areaPendingRemoval = ref<number | null>(null);
+// by `areaPendingRemoval` (the area id, NOT an index — so a reorder can never
+// retarget the wrong row) — never one dialog per row. `removeArea` only opens the
+// dialog; `confirmRemoveArea` resolves the id and performs the splice.
+const areaPendingRemoval = ref<string | null>(null);
 const removeTrigger = ref<HTMLElement | null>(null);
 
 const pendingArea = computed<AreaConfig | null>(() =>
-  areaPendingRemoval.value === null ? null : (localAreas.value[areaPendingRemoval.value] ?? null)
+  areaPendingRemoval.value === null
+    ? null
+    : (localAreas.value.find(a => a.id === areaPendingRemoval.value) ?? null)
 );
 const pendingBlockCount = computed<number>(() =>
   pendingArea.value ? (props.blockCountsByArea?.[pendingArea.value.id] ?? 0) : 0
 );
 
-function removeArea(index: number) {
+function removeArea(area: AreaConfig) {
   // Remember the trigger so focus can return to it if the user cancels.
   const el = document.activeElement;
   removeTrigger.value = el instanceof HTMLElement ? el : null;
-  areaPendingRemoval.value = index;
+  areaPendingRemoval.value = area.id;
 }
 
 function confirmRemoveArea() {
-  const index = areaPendingRemoval.value;
-  if (index === null) return;
+  const id = areaPendingRemoval.value;
+  if (id === null) return;
+  const index = localAreas.value.findIndex(a => a.id === id);
+  if (index === -1) {
+    areaPendingRemoval.value = null;
+    return;
+  }
   const area = localAreas.value[index];
   localAreas.value.splice(index, 1);
   validateAreas();
@@ -738,7 +746,10 @@ function save() {
   validateAreas();
 
   if (!hasErrors.value) {
-    emit('update:areas', [...localAreas.value]);
+    // The orphaned area is system-managed (injected at runtime from orphaned
+    // blocks); never persist it into the field config, or it lingers as a phantom
+    // entry once the orphaned blocks are gone.
+    emit('update:areas', localAreas.value.filter(a => a.id !== ORPHANED_AREA_ID));
     emit('close');
   }
 }
