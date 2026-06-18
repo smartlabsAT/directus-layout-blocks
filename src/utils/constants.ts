@@ -36,6 +36,11 @@ export const DRAG_ANIMATION_DURATION = 200;
 export const MAX_AREA_ID_LENGTH = 64;
 export const MAX_AREA_LABEL_LENGTH = 255;
 
+// The special, system-managed area that collects blocks whose area no longer
+// exists. It is injected/removed automatically (interface.vue computedAreas) and
+// is always locked — never user-creatable, -editable, -removable or -unlockable.
+export const ORPHANED_AREA_ID = 'orphaned';
+
 // Status options for blocks
 export const STATUS_OPTIONS = [
   { text: 'Published', value: 'published' },

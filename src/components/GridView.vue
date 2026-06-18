@@ -71,7 +71,7 @@
               :area="area"
               :compact="options.compactMode"
               :permissions="permissions"
-              :draggable="options.enableDragDrop && (!area.locked || area.id === 'orphaned')"
+              :draggable="options.enableDragDrop && (!area.locked || area.id === ORPHANED_AREA_ID)"
               :grabbed="isBlockGrabbed(block.id)"
               @edit="$emit('update-block', { blockId: block.id })"
               @remove="$emit('remove-block', block.id)"
@@ -138,6 +138,7 @@ import type {
 import BlockItemComponent from './BlockItem.vue';
 import EmptyState from './EmptyState.vue';
 import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
+import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 
 // Props
@@ -328,7 +329,7 @@ function handleBlockStatusUpdate(block: BlockItem, newStatus: string) {
 // Drag & Drop
 function handleDragStart(event: DragEvent, block: BlockItem, area: AreaConfig) {
   // Allow dragging from orphaned area even if it's locked
-  if (!props.options.enableDragDrop || (area.locked && area.id !== 'orphaned')) {
+  if (!props.options.enableDragDrop || (area.locked && area.id !== ORPHANED_AREA_ID)) {
     event.preventDefault();
     return;
   }
@@ -382,7 +383,7 @@ function handleDragOver(event: DragEvent, area: AreaConfig) {
   const areaElement = event.currentTarget as HTMLElement;
   
   // Don't allow dropping into orphaned area
-  if (!draggedBlock.value || area.id === 'orphaned') {
+  if (!draggedBlock.value || area.id === ORPHANED_AREA_ID) {
     event.preventDefault();
     event.dataTransfer!.dropEffect = 'none';
     areaElement.classList.add('drag-not-allowed');
@@ -392,7 +393,7 @@ function handleDragOver(event: DragEvent, area: AreaConfig) {
   }
   
   // Allow dropping into other locked areas if they aren't orphaned
-  if (area.locked && area.id !== 'orphaned') {
+  if (area.locked && area.id !== ORPHANED_AREA_ID) {
     event.preventDefault();
     event.dataTransfer!.dropEffect = 'none';
     areaElement.classList.add('drag-not-allowed');
@@ -441,12 +442,12 @@ function handleDrop(event: DragEvent, targetArea: AreaConfig) {
   event.preventDefault();
   
   // Don't allow dropping into orphaned area
-  if (!draggedBlock.value || !draggedFromArea.value || targetArea.id === 'orphaned') {
+  if (!draggedBlock.value || !draggedFromArea.value || targetArea.id === ORPHANED_AREA_ID) {
     return;
   }
   
   // Allow dropping into other areas if they aren't orphaned
-  if (targetArea.locked && targetArea.id !== 'orphaned') {
+  if (targetArea.locked && targetArea.id !== ORPHANED_AREA_ID) {
     return;
   }
 
@@ -479,7 +480,7 @@ function handleDrop(event: DragEvent, targetArea: AreaConfig) {
 
 function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   // Never allow dropping into orphaned area
-  if (area.id === 'orphaned') {
+  if (area.id === ORPHANED_AREA_ID) {
     return false;
   }
 
