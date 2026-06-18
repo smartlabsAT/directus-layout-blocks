@@ -304,24 +304,24 @@
           ref="areaManagerRef"
           :areas="allConfiguredAreas"
           :available-collections="formattedAllowedCollections"
+          :block-counts-by-area="blockCountsByArea"
           @update:areas="handleAreasUpdate"
           @close="showAreaManager = false"
         />
         
         <template #actions>
-          <!-- Directus's v-drawer renders only the LAST child of its actions
-               slot (.action-buttons > :not(:last-child) { display: none }), so
-               wrap our buttons in one element to show both. The header's X
-               (top-left) is the native cancel/discard. -->
-          <div class="drawer-actions">
-            <v-button v-tooltip="'Add area'" secondary small @click="addAreaInManager">
-              <v-icon name="add" left />
-              Add area
-            </v-button>
-            <v-button @click="saveAreas">
-              Save Areas
-            </v-button>
-          </div>
+          <!-- Native Directus drawer pattern: a single round primary action
+               (Save). The header X (top-left) is the native cancel/discard, and
+               "Add area" lives in the drawer body where additive actions belong. -->
+          <v-button
+            v-tooltip="'Save areas'"
+            v-btn-aria="{ 'aria-label': 'Save areas' }"
+            rounded
+            icon
+            @click="saveAreas"
+          >
+            <v-icon name="check" />
+          </v-button>
         </template>
       </v-drawer>
     </div>
@@ -338,8 +338,9 @@ import { useAutoSetup } from './composables/useAutoSetup';
 import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { useBlockPermissions } from './composables/useBlockPermissions';
-import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG } from './utils/constants';
+import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG, ORPHANED_AREA_ID } from './utils/constants';
 import { normalizeAreaIds, isTempId, formatCollectionName } from './utils/helpers';
+import { getCollectionIcon } from './utils/blockHelpers';
 import { cloneDeep } from 'lodash-es';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type {
@@ -347,7 +348,8 @@ import type {
   JunctionInfo,
   BlockItem,
   BlockId,
-  AreaConfig
+  AreaConfig,
+  CollectionOption
 } from './types';
 
 // Import components (we'll create these next)
@@ -658,12 +660,12 @@ const computedAreas = computed<AreaConfig[]>(() => {
   areas = normalizeAreaIds(areas, options.value.defaultArea || 'main');
 
   // Only add orphaned area if there are orphaned blocks
-  const hasOrphanedBlocks = blocks.value.some(b => b.area === 'orphaned');
-  const hasOrphanedArea = areas.some(a => a.id === 'orphaned');
+  const hasOrphanedBlocks = blocks.value.some(b => b.area === ORPHANED_AREA_ID);
+  const hasOrphanedArea = areas.some(a => a.id === ORPHANED_AREA_ID);
   
   if (hasOrphanedBlocks && !hasOrphanedArea) {
     areas.push({
-      id: 'orphaned',
+      id: ORPHANED_AREA_ID,
       label: 'Orphaned Blocks',
       icon: 'help_outline',
       width: 100,
@@ -671,7 +673,7 @@ const computedAreas = computed<AreaConfig[]>(() => {
     });
   } else if (!hasOrphanedBlocks && hasOrphanedArea) {
     // Remove orphaned area if no orphaned blocks exist
-    areas = areas.filter(a => a.id !== 'orphaned');
+    areas = areas.filter(a => a.id !== ORPHANED_AREA_ID);
   }
   
   return areas;
@@ -729,6 +731,16 @@ function getBlocksForArea(areaId: string): BlockItem[] {
   return blocks.value.filter(b => b.area === areaId);
 }
 
+// Per-area block counts for the AreaManager delete-confirmation orphan warning.
+// One O(n) reduce over blocks, exposed as a map areaId -> count.
+const blockCountsByArea = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const block of blocks.value) {
+    counts[block.area] = (counts[block.area] || 0) + 1;
+  }
+  return counts;
+});
+
 // Get allowed collections for M2A
 const allowedCollections = computed(() => {
   // First check if user has selected specific collections in interface options
@@ -745,12 +757,15 @@ const allowedCollections = computed(() => {
   return null;
 });
 
-// Build a { text, value } option for the AreaManager collection picker, reusing
-// the Directus collection display name (falls back to a prettified key).
-function formatCollectionOption(collectionName: string): { text: string; value: string } {
+// Build a CollectionOption for the AreaManager collection picker, reusing the
+// Directus collection display name (falls back to a prettified key) and its
+// configured icon (falls back to the shared collection-icon helper).
+function formatCollectionOption(collectionName: string): CollectionOption {
+  const collection = collectionsStore.getCollection(collectionName);
   return {
-    text: collectionsStore.getCollection(collectionName)?.name || formatCollectionName(collectionName),
-    value: collectionName
+    text: collection?.name || formatCollectionName(collectionName),
+    value: collectionName,
+    icon: collection?.icon || getCollectionIcon(collectionName)
   };
 }
 
@@ -1206,20 +1221,6 @@ function getTranslatedFieldValue(item: any, field: string): any {
 
 function isFieldTranslatable(field: string): boolean {
   return itemSelector?.isFieldTranslatable(field) || false;
-}
-
-function getCollectionIcon(collection: string): string {
-  const collectionInfo: Record<string, any> = {
-    content_headline: { icon: 'title' },
-    content_text: { icon: 'text_fields' },
-    content_image: { icon: 'image' },
-    content_video: { icon: 'videocam' },
-    content_cta: { icon: 'ads_click' },
-    content_button: { icon: 'smart_button' },
-    content_wysiwig: { icon: 'edit_note' },
-    content_block: { icon: 'widgets' }
-  };
-  return collectionInfo[collection]?.icon || 'widgets';
 }
 
 async function handleItemSelectorLinked(items: any[]) {
@@ -1699,7 +1700,7 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
         // write — keeps the form in a single consistent, discardable state).
         const blockIndex = blocks.value.findIndex(b => b.id === block.id);
         if (blockIndex !== -1) {
-          blocks.value[blockIndex].area = 'orphaned';
+          blocks.value[blockIndex].area = ORPHANED_AREA_ID;
           markBlockDirty(block.id, true);
           logger.log(`Interface: Block ${block.id} staged for orphaning`);
         }
@@ -1764,12 +1765,6 @@ async function handleAreasUpdate(updatedAreas: AreaConfig[]) {
 }
 
 // Save areas from area manager
-// Triggers a new area row from the area-manager drawer header (the body
-// "Add area" button moved into the drawer #actions slot in #55).
-function addAreaInManager() {
-  areaManagerRef.value?.addArea();
-}
-
 function saveAreas() {
   if (areaManagerRef.value) {
     areaManagerRef.value.save();
@@ -1966,12 +1961,15 @@ watch(() => props.value, () => {
   min-height: 400px;
 }
 
-/* Wrapper so multiple drawer header actions survive Directus's
-   .action-buttons > :not(:last-child) { display: none } rule. */
-.drawer-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+</style>
 
+<!-- Unscoped on purpose: the v-drawer panel is teleported (no component scope id)
+     and Directus doesn't forward a class onto the panel. Target only OUR drawer
+     via :has(.area-manager) — the panel that contains the AreaManager — so no
+     other Directus drawer is affected. It hosts a wide table, hence a modest bump
+     beyond the native 856px. -->
+<style lang="scss">
+.v-drawer:has(.area-manager) {
+  max-width: 1040px !important;
+}
 </style>

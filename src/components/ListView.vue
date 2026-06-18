@@ -35,7 +35,7 @@
         :class="{
           active: selectedArea === area.id,
           'has-blocks': hasBlocks(area.id),
-          'orphaned': area.id === 'orphaned'
+          'orphaned': area.id === ORPHANED_AREA_ID
         }"
         :data-area-id="area.id"
         @click="selectArea(area.id)"
@@ -46,7 +46,7 @@
       >
         <v-icon v-if="area.icon" :name="area.icon" small />
         <span>{{ area.label }}</span>
-        <v-chip v-if="getAreaBlocks(area.id).length > 0" x-small :class="{ 'warning': area.id === 'orphaned' }">
+        <v-chip v-if="getAreaBlocks(area.id).length > 0" x-small :class="{ 'warning': area.id === ORPHANED_AREA_ID }">
           {{ getAreaBlocks(area.id).length }}
         </v-chip>
       </button>
@@ -81,7 +81,7 @@
         <table class="blocks-table" role="grid">
           <thead>
             <tr role="row">
-              <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" role="columnheader" style="width: 40px"></th>
+              <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === ORPHANED_AREA_ID)" role="columnheader" style="width: 40px"></th>
               <th role="columnheader" style="width: 40px"></th>
               <th role="columnheader">
                 <div class="header-with-icon">
@@ -101,7 +101,7 @@
                   <span>Status</span>
                 </div>
               </th>
-              <th v-if="selectedArea === null || selectedArea === 'orphaned'" role="columnheader" style="width: 15%">
+              <th v-if="selectedArea === null || selectedArea === ORPHANED_AREA_ID" role="columnheader" style="width: 15%">
                 <div class="header-with-icon">
                   <v-icon name="dashboard" small />
                   <span>Area</span>
@@ -123,7 +123,7 @@
               :class="{ 'kb-grabbed': kbIsGrabbed(block.id) }"
               role="row"
             >
-              <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === 'orphaned')" role="gridcell" class="drag-cell">
+              <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === ORPHANED_AREA_ID)" role="gridcell" class="drag-cell">
                 <div
                   class="drag-handle"
                   role="button"
@@ -166,7 +166,7 @@
                 />
               </td>
               
-              <td v-if="selectedArea === null || selectedArea === 'orphaned'" role="gridcell" class="area-cell">
+              <td v-if="selectedArea === null || selectedArea === ORPHANED_AREA_ID" role="gridcell" class="area-cell">
                 <v-chip 
                   v-if="getAreaForBlock(block)"
                   small
@@ -272,7 +272,8 @@ import AddBlockDropdown from './AddBlockDropdown.vue';
 import StatusSelector from './StatusSelector.vue';
 import EmptyState from './EmptyState.vue';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
-import { createDragImage } from '../utils/blockHelpers';
+import { createDragImage, getBlockIcon } from '../utils/blockHelpers';
+import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 import { vBtnAria } from '../directives/btnAria';
 import type {
@@ -372,10 +373,10 @@ const selectedAreaBlocks = computed(() => {
       }
       return a.sort - b.sort;
     });
-  } else if (props.selectedArea === 'orphaned') {
+  } else if (props.selectedArea === ORPHANED_AREA_ID) {
     // Show blocks in orphaned area
     logger.log('🟣 ListView: Showing orphaned blocks');
-    return getAreaBlocks('orphaned');
+    return getAreaBlocks(ORPHANED_AREA_ID);
   } else {
     // Show blocks for specific area
     const blocks = getAreaBlocks(props.selectedArea || '');
@@ -385,19 +386,19 @@ const selectedAreaBlocks = computed(() => {
 });
 
 const orphanedBlocks = computed(() => {
-  // In the new system, orphaned blocks have area === 'orphaned'
-  return props.blocks.filter(block => block.area === 'orphaned');
+  // In the new system, orphaned blocks have area === ORPHANED_AREA_ID
+  return props.blocks.filter(block => block.area === ORPHANED_AREA_ID);
 });
 
 const hasOrphanedArea = computed(() => {
   // Check if orphaned area exists in areas list
-  return props.areas.some(a => a.id === 'orphaned');
+  return props.areas.some(a => a.id === ORPHANED_AREA_ID);
 });
 
 // Watch for when orphaned blocks become empty
 watch(orphanedBlocks, (newOrphaned, oldOrphaned) => {
   // If we're currently viewing orphaned blocks and they become empty
-  if (props.selectedArea === 'orphaned' && oldOrphaned.length > 0 && newOrphaned.length === 0) {
+  if (props.selectedArea === ORPHANED_AREA_ID && oldOrphaned.length > 0 && newOrphaned.length === 0) {
     logger.log('🟣 ListView: No more orphaned blocks, switching to first available area');
     // Switch to first visible area
     if (visibleAreas.value.length > 0) {
@@ -407,16 +408,6 @@ watch(orphanedBlocks, (newOrphaned, oldOrphaned) => {
     }
   }
 });
-
-// Collection icon mapping
-const collectionIcons: Record<string, string> = {
-  content_headline: 'title',
-  content_text: 'text_fields',
-  content_image: 'image',
-  content_video: 'videocam',
-  content_hero: 'landscape',
-  content_cta: 'ads_click'
-};
 
 // Keyboard drag & drop (KEYBOARD_AND_A11Y.md §3): the row's drag handle is the
 // grab target. ListView shows one area at a time, so onAreaChange follows the
@@ -513,10 +504,6 @@ function getAreaChipStyle(block: BlockItem) {
 function getAreaProgress(area: AreaConfig): number {
   if (!area.maxItems) return 0;
   return (getAreaBlocks(area.id).length / area.maxItems) * 100;
-}
-
-function getBlockIcon(block: BlockItem): string {
-  return collectionIcons[block.collection] || 'widgets';
 }
 
 function getBlockTitle(block: BlockItem): string {
@@ -694,7 +681,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
   logger.log('🟣 ListView: Dropping block', blockId, 'from', sourceArea, 'to', targetAreaId);
   
   // Check if this is the last orphaned block
-  const isLastOrphanedBlock = props.selectedArea === 'orphaned' && orphanedBlocks.value.length === 1;
+  const isLastOrphanedBlock = props.selectedArea === ORPHANED_AREA_ID && orphanedBlocks.value.length === 1;
   
   // Emit move event
   emit('move-block', {
@@ -715,7 +702,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
 
 function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   // Never allow dropping into orphaned area
-  if (area.id === 'orphaned') {
+  if (area.id === ORPHANED_AREA_ID) {
     return false;
   }
   

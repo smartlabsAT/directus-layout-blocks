@@ -1,7 +1,16 @@
 <template>
-  <div class="area-manager">
+  <div ref="rootEl" class="area-manager">
     <div class="manager-content">
       <div class="area-section">
+        <!-- "Add area" lives in the drawer body (CI: the drawer header keeps a
+             single native round Save action). -->
+        <div class="area-section-toolbar">
+          <v-button secondary small @click="addArea">
+            <v-icon name="add" left />
+            Add area
+          </v-button>
+        </div>
+
         <div v-if="localAreas.length > 0" class="areas-table-wrapper">
           <table class="areas-table">
             <thead>
@@ -12,8 +21,8 @@
                 <th>ID</th>
                 <th style="width: 150px">Width</th>
                 <th style="width: 100px">Max Items</th>
-                <th>Allowed Collections</th>
-                <th style="width: 60px">Actions</th>
+                <th>Collections</th>
+                <th style="width: 90px">Actions</th>
               </tr>
             </thead>
             <draggable
@@ -229,20 +238,24 @@
                   <!-- Allowed Collections -->
                   <td class="collections-cell">
                     <div class="collections-list">
-                      <div v-if="area.allowedTypes && area.allowedTypes.length > 0" class="collection-tags">
-                        <v-chip
-                          v-for="collection in area.allowedTypes"
-                          :key="collection"
-                          small
-                          close
-                          :disabled="area.locked"
-                          @close="!area.locked && removeCollection(area, collection)"
-                        >
-                          {{ getCollectionLabel(collection) }}
+                      <div class="collection-tags">
+                        <template v-if="area.allowedTypes && area.allowedTypes.length > 0">
+                          <v-chip
+                            v-for="collection in area.allowedTypes"
+                            :key="collection"
+                            small
+                            close
+                            :disabled="area.locked"
+                            @close="!area.locked && removeCollection(area, collection)"
+                          >
+                            {{ getCollectionLabel(collection) }}
+                          </v-chip>
+                        </template>
+                        <!-- No restriction = a non-removable "All collections" chip,
+                             so empty and filled cells stay visually consistent. -->
+                        <v-chip v-else small class="all-collections-chip">
+                          All collections
                         </v-chip>
-                      </div>
-                      <div v-else class="no-collections">
-                        All collections
                       </div>
                       <v-menu
                         v-if="!area.locked && getAvailableCollectionsForArea(area).length > 0"
@@ -253,6 +266,7 @@
                           <v-button
                             x-small
                             icon
+                            secondary
                             v-btn-aria="{ 'aria-label': 'Add allowed collection', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                             @click="toggle"
                           >
@@ -266,6 +280,9 @@
                             clickable
                             @click="addCollection(area, collection.value)"
                           >
+                            <v-list-item-icon>
+                              <v-icon :name="collection.icon || 'box'" small />
+                            </v-list-item-icon>
                             <v-list-item-content>{{ collection.text }}</v-list-item-content>
                           </v-list-item>
                         </v-list>
@@ -274,6 +291,24 @@
                   </td>
 
                   <td class="actions-cell">
+                    <!-- Lock/unlock toggle: ALWAYS rendered so a locked area can be
+                         unlocked again. The orphaned area is system-locked and not
+                         toggleable (disabled). -->
+                    <v-button
+                      v-tooltip="isOrphaned(area) ? 'This area cannot be unlocked' : (area.locked ? 'Unlock area' : 'Lock area')"
+                      v-btn-aria="{
+                        'aria-label': area.locked ? 'Unlock area' : 'Lock area',
+                        'aria-pressed': !!area.locked,
+                        'aria-disabled': isOrphaned(area) || undefined
+                      }"
+                      icon
+                      x-small
+                      secondary
+                      :disabled="isOrphaned(area)"
+                      @click="toggleLock(area, index)"
+                    >
+                      <v-icon :name="area.locked ? 'lock' : 'lock_open'" />
+                    </v-button>
                     <v-button
                       v-if="!area.locked"
                       v-tooltip="'Remove area'"
@@ -286,13 +321,6 @@
                     >
                       <v-icon name="delete" />
                     </v-button>
-                    <v-icon
-                      v-else
-                      v-tooltip="'This area cannot be removed'"
-                      name="lock"
-                      small
-                      aria-label="locked"
-                    />
                   </td>
                 </tr>
               </template>
@@ -306,14 +334,24 @@
           message='No areas defined yet — use "Add area" to create one.'
         />
 
-        <!--
-          Explains the locked-row treatment (lock icon + disabled inline edit).
-          Shown only when at least one area is field-configured/locked.
-        -->
+        <!-- Communicates the one non-obvious lock effect: locking also freezes the
+             area's blocks in the layout views. The row-level freeze (static fields,
+             lock icon) is already visible, so it isn't repeated here. -->
         <p v-if="hasLockedAreas" class="locked-hint">
           <v-icon name="info" small />
-          Locked areas are defined in the field configuration and can't be edited here.
+          Locking an area also freezes its blocks — they can't be added, moved or reordered.
         </p>
+
+        <!-- Single shared removal confirm (rendered once, outside the row loop):
+             one instance driven by areaPendingRemoval, never one per row. -->
+        <AreaDeleteConfirm
+          :model-value="areaPendingRemoval !== null"
+          :area-label="pendingArea?.label || pendingArea?.id || ''"
+          :block-count="pendingBlockCount"
+          @update:model-value="(open) => { if (!open) cancelRemove(); }"
+          @confirm="confirmRemoveArea"
+          @cancel="cancelRemove"
+        />
       </div>
     </div>
   </div>
@@ -323,16 +361,21 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { vBtnAria } from '../directives/btnAria';
 import EmptyState from './EmptyState.vue';
+import AreaDeleteConfirm from './AreaDeleteConfirm.vue';
 import { cloneDeep } from 'lodash-es';
 import draggable from 'vuedraggable';
-import type { AreaConfig } from '../types';
-import { WIDTH_OPTIONS, AREA_ICON_CHOICES } from '../utils/constants';
+import type { AreaConfig, CollectionOption } from '../types';
+import { WIDTH_OPTIONS, AREA_ICON_CHOICES, ORPHANED_AREA_ID } from '../utils/constants';
 import { validateAreaConfig, sanitizeAreaId } from '../utils/validators';
+import { logger } from '../utils/logger';
 
 // Props
 interface Props {
   areas: AreaConfig[];
-  availableCollections?: Array<{ text: string; value: string }>;
+  availableCollections?: CollectionOption[];
+  // Map areaId -> block count, used for the removal orphan warning. Optional with
+  // a safe default so the manager renders even if a parent omits it.
+  blockCountsByArea?: Record<string, number>;
 }
 
 const props = defineProps<Props>();
@@ -357,6 +400,8 @@ type TextEditField = Exclude<EditableField, 'width'>;
 // from `areas` to avoid a prop/ref name collision that made the template binding
 // ambiguous).
 const localAreas = ref<AreaConfig[]>([]);
+// Root element, used as a focus fallback after a removed row's trigger is gone.
+const rootEl = ref<HTMLElement | null>(null);
 const errors = ref<Record<string, string[]>>({});
 // Index + field are tracked separately (not as a composite "i-field" string) so
 // the Tab-advance logic never has to parse a key.
@@ -396,9 +441,82 @@ function addArea() {
   validateAreas();
 }
 
+function isOrphaned(area: AreaConfig): boolean {
+  return area.id === ORPHANED_AREA_ID;
+}
+
+// Toggle an area's lock from the editor. NOTE: locking freezes the WHOLE area —
+// the row here AND its blocks in the layout views (add/move/drag all key off
+// `locked`). The orphaned area is system-locked and never toggleable. If the row
+// being locked is mid inline-edit, cancel that edit first so no commit lands on a
+// now-locked area.
+function toggleLock(area: AreaConfig, index: number) {
+  if (isOrphaned(area)) return;
+  if (!area.locked && editingArea.value === index) cancelEdit();
+  area.locked = !area.locked;
+  validateAreas();
+}
+
+// --- Area removal with confirmation ----------------------------------------
+// A single shared confirm dialog (rendered once, outside the row loop) is driven
+// by `areaPendingRemoval` (the row index) — never one dialog per row. `removeArea`
+// only opens the dialog; `confirmRemoveArea` performs the splice.
+const areaPendingRemoval = ref<number | null>(null);
+const removeTrigger = ref<HTMLElement | null>(null);
+
+const pendingArea = computed<AreaConfig | null>(() =>
+  areaPendingRemoval.value === null ? null : (localAreas.value[areaPendingRemoval.value] ?? null)
+);
+const pendingBlockCount = computed<number>(() =>
+  pendingArea.value ? (props.blockCountsByArea?.[pendingArea.value.id] ?? 0) : 0
+);
+
 function removeArea(index: number) {
+  // Remember the trigger so focus can return to it if the user cancels.
+  const el = document.activeElement;
+  removeTrigger.value = el instanceof HTMLElement ? el : null;
+  areaPendingRemoval.value = index;
+}
+
+function confirmRemoveArea() {
+  const index = areaPendingRemoval.value;
+  if (index === null) return;
+  const area = localAreas.value[index];
   localAreas.value.splice(index, 1);
   validateAreas();
+  logger.log('Area removed', {
+    areaId: area?.id,
+    label: area?.label,
+    blockCount: area ? (props.blockCountsByArea?.[area.id] ?? 0) : 0
+  });
+  areaPendingRemoval.value = null;
+  // The trigger button was removed with its row → focus a stable fallback.
+  restoreFocusAfterRemove(true);
+}
+
+function cancelRemove() {
+  areaPendingRemoval.value = null;
+  restoreFocusAfterRemove(false);
+}
+
+// Return focus after the dialog closes. On cancel the trigger still exists; on
+// confirm it was removed with its row, so fall back to a stable anchor. The
+// `document.contains` guard ensures focus never lands on a detached node.
+function restoreFocusAfterRemove(triggerRemoved: boolean) {
+  const el = removeTrigger.value;
+  removeTrigger.value = null;
+  // On cancel the trigger still exists → restore to it on the next tick.
+  if (!triggerRemoved && el && document.contains(el)) {
+    nextTick(() => { if (document.contains(el)) el.focus(); });
+    return;
+  }
+  // On confirm the trigger row (and its focused button) is removed; the v-dialog
+  // resets focus to <body> as it tears down, AFTER a single nextTick. Defer one
+  // animation frame past that before moving focus to a stable fallback anchor.
+  nextTick(() => requestAnimationFrame(() => {
+    (rootEl.value?.querySelector<HTMLElement>('.actions-cell button')
+      ?? rootEl.value?.querySelector<HTMLElement>('button'))?.focus();
+  }));
 }
 
 // Picks an area's icon from the curated grid. Like the inline-edit mutators, this
@@ -577,7 +695,7 @@ function getCollectionLabel(collection: string): string {
   return found?.text || collection;
 }
 
-function getAvailableCollectionsForArea(area: AreaConfig): Array<{ text: string; value: string }> {
+function getAvailableCollectionsForArea(area: AreaConfig): CollectionOption[] {
   if (!props.availableCollections) return [];
 
   const usedCollections = area.allowedTypes || [];
@@ -649,6 +767,11 @@ defineExpose({
   gap: 32px;
 }
 
+.area-section-toolbar {
+  display: flex;
+  margin-bottom: 16px;
+}
+
 .areas-table-wrapper {
   overflow-x: auto;
   border: var(--theme--border-width) solid var(--theme--border-color-subdued);
@@ -660,17 +783,22 @@ defineExpose({
   width: 100%;
   border-collapse: collapse;
 
-  /* Sentence-case, subdued, hairline header (tokenized — matches ListView #51).
-     The header is not sticky here, so it carries no fill and inherits the
-     wrapper's --theme--background (screenshots/05). */
+  /* Subdued header with a tokenized fill — mirrors the redesigned ListView table
+     header (#51, issue #73). Not sticky here: the table's vertical scroll lives on
+     .manager-content, not the table, so a sticky thead wouldn't track it. Keeps
+     --theme--border-width (not a hardcoded 1px). */
   thead {
     th {
       padding: 12px;
       text-align: left;
       font-weight: 600;
       font-size: 12px;
-      color: var(--theme--foreground-subdued);
-      border-bottom: var(--theme--border-width) solid var(--theme--border-color-subdued);
+      white-space: nowrap;
+      /* Normal foreground (not -subdued) for readable contrast on the subdued
+         header fill — subdued-on-subdued was too light. */
+      color: var(--theme--foreground);
+      background: var(--theme--background-subdued);
+      border-bottom: var(--theme--border-width) solid var(--theme--border-color);
     }
   }
 
@@ -705,7 +833,12 @@ defineExpose({
 
       &.actions-cell {
         text-align: center;
-        width: 60px;
+        white-space: nowrap;
+        width: 90px;
+
+        .v-button {
+          margin: 0 1px;
+        }
       }
 
       &.collections-cell {
@@ -831,28 +964,42 @@ defineExpose({
   }
 }
 
+/* Chips on top, the add "+" below — consistent for both the empty state (a
+   non-removable "All collections" chip) and explicitly selected collections. */
 .collections-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   align-items: flex-start;
+  gap: 6px;
 
   .collection-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
   }
+}
 
-  .no-collections {
-    color: var(--theme--foreground-subdued);
-    font-style: italic;
-    font-size: 13px;
-    padding: 4px 0;
-  }
+/* The "no restriction" placeholder: same chip shape as a real collection, but
+   italic + subdued so it reads as the default rather than an explicit pick. */
+.all-collections-chip {
+  font-style: italic;
+  --v-chip-color: var(--theme--foreground-subdued);
+}
 
-  .v-button {
-    margin-top: 4px;
-  }
+/* The sibling expandable-blocks extension leaks a global
+   `.close-outline { background: red !important }` (see project memory
+   extension-css-global-collision) that turns the native v-chip close button into
+   an ugly solid-red circle. Restore the native subtle treatment for our
+   collection chips — scoped + !important to beat the leak. */
+.collections-cell :deep(.v-chip .close-outline) {
+  background: transparent !important;
+  border-left: none !important;
+  border-radius: 50% !important;
+  right: auto !important;
+}
+
+.collections-cell :deep(.v-chip .close-outline:hover) {
+  background: var(--theme--danger-background) !important;
 }
 
 .locked-hint {

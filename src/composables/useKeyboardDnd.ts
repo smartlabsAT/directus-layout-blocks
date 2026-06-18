@@ -1,6 +1,7 @@
 import { ref, nextTick, type Ref } from 'vue';
 import { logger } from '../utils/logger';
 import type { BlockItem, BlockId, AreaConfig } from '../types';
+import { ORPHANED_AREA_ID } from '../utils/constants';
 
 /**
  * Keyboard equivalent of the pointer drag & drop (KEYBOARD_AND_A11Y.md §3).
@@ -89,7 +90,7 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
     /* Mirror the pointer rule: locked areas can't be dragged out of, except the
        orphaned area (which is itself never a drop target but its blocks may be
        rescued out of it). */
-    if (source?.locked && source.id !== 'orphaned') return false;
+    if (source?.locked && source.id !== ORPHANED_AREA_ID) return false;
     return true;
   }
 
@@ -127,7 +128,7 @@ export function useKeyboardDnd(deps: KeyboardDndDeps) {
   function moveAcross(block: BlockItem, direction: -1 | 1): void {
     /* Only real areas are traversal targets; the orphaned area is never a drop
        target, so exclude it from the left/right order. */
-    const order = deps.areas.value.filter((a) => a.id !== 'orphaned');
+    const order = deps.areas.value.filter((a) => a.id !== ORPHANED_AREA_ID);
     const curIdx = order.findIndex((a) => a.id === block.area);
     let k = curIdx + direction;
     let skipped = false;

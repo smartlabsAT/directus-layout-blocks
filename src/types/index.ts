@@ -110,3 +110,14 @@ export interface M2AFieldInfo {
   areaField?: string;
   sortField?: string;
 }
+
+/**
+ * A selectable collection option for the AreaManager "Allowed Collections" picker.
+ * `icon` is the collection's configured Directus icon (optional — the menu falls
+ * back to a generic icon at render time when absent).
+ */
+export interface CollectionOption {
+  text: string;
+  value: string;
+  icon?: string;
+}
