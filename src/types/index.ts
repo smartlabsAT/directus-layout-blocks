@@ -15,6 +15,7 @@ export interface LayoutBlocksOptions {
   // Display
   viewMode?: 'grid' | 'list';      // Default: 'grid'
   compactMode?: boolean;           // Default: false
+  fullWidth?: boolean;             // Default: false — break out of the form column to full width
   showEmptyAreas?: boolean;        // Default: true
   
   // Advanced

@@ -15,6 +15,7 @@ export const DEFAULT_OPTIONS = {
   showEmptyAreas: true,
   viewMode: 'grid' as const,
   compactMode: false,
+  fullWidth: false,
   autoSetup: true,
   deleteItems: false,
   enableAreaManagement: false,

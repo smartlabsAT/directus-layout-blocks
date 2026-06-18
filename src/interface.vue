@@ -1,5 +1,5 @@
 <template>
-  <div class="layout-blocks-interface">
+  <div ref="rootEl" class="layout-blocks-interface">
     <!-- Loading State -->
     <div v-if="loading" class="layout-blocks-loading">
       <v-progress-circular indeterminate />
@@ -608,7 +608,52 @@ onUnmounted(() => {
   toolbarObserver?.disconnect();
   toolbarObserver = null;
   document.documentElement.style.removeProperty('--lb-toolbar-height');
+  // Revert the full-width breakout (if any) so we never leave an inline override
+  // on a Directus-owned `.field` after the interface is gone.
+  applyFullWidthBreakout(false);
 });
+
+// Full-width breakout (options.fullWidth): the interface normally renders inside
+// the Directus form grid cell, which caps content width (e.g. the 380px columns
+// of a `with-fill` form). When enabled, span the hosting `.field` across the whole
+// form grid (`grid-column: 1 / -1`) so the editor uses the full available width —
+// independent of the form's fill mode or the field's half/full width. The form's
+// standard horizontal padding is intentionally KEPT (we do not break out of it),
+// so the editor still has the normal left/right breathing room instead of sticking
+// to the edges. Applied as an inline style on the ancestor `.field` (scoped styles
+// cannot reach an ancestor) and fully reverted when the option is off or on unmount,
+// so nothing leaks into the app globally.
+const rootEl = ref<HTMLElement | null>(null);
+let breakoutField: HTMLElement | null = null;
+
+function applyFullWidthBreakout(enabled: boolean) {
+  // Always clear a previously-styled field first (option toggled off, or the host
+  // element changed across a re-render) so we never leave an orphaned override.
+  if (breakoutField) {
+    breakoutField.style.removeProperty('grid-column');
+    breakoutField = null;
+  }
+  if (!enabled) return;
+  // Relies on Directus' form-field markup: the interface is wrapped in a `.field`.
+  // If it is absent (e.g. the interface is used outside a form), we simply no-op —
+  // no breakout, no error.
+  const field = rootEl.value?.closest('.field') as HTMLElement | null;
+  if (!field) return;
+  breakoutField = field;
+  // Span the full form grid (defeats the `with-fill` 380px column cap) while
+  // staying inside the form's standard horizontal padding — full width, but with
+  // the normal left/right breathing room preserved.
+  field.style.setProperty('grid-column', '1 / -1');
+}
+
+// `immediate` covers the initial render; the watch also re-applies when the option
+// resolves late (field meta can load after mount) or is toggled. nextTick ensures
+// the root element (and thus its `.field` ancestor) exists before we query it.
+watch(
+  () => options.value.fullWidth,
+  (enabled) => { nextTick(() => applyFullWidthBreakout(!!enabled)); },
+  { immediate: true },
+);
 
 // Computed property for current collection fields
 const editingCollectionFields = computed(() => {
