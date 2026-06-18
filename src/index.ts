@@ -299,6 +299,22 @@ export default defineInterface({
       }
     },
     {
+      field: 'fullWidth',
+      name: 'Full Width',
+      type: 'boolean',
+      meta: {
+        width: 'half',
+        interface: 'boolean',
+        options: {
+          label: 'Render the editor across the full form width'
+        },
+        note: 'Breaks the interface out of the form column to use the full available width'
+      },
+      schema: {
+        default_value: false
+      }
+    },
+    {
       field: 'enableAreaManagement',
       name: 'Enable Area Management',
       type: 'boolean',
