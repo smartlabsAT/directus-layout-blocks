@@ -242,7 +242,6 @@ const componentLogger = logger.scope('MyComponent');
   - **ARCHITECTURE.md** - System architecture
   - **CHANGELOG.md** - Version history
   - **CONTRIBUTING.md** - Contribution guidelines
-  - **ROADMAP.md** - Future plans
 
 ## Git Commit Guidelines
 

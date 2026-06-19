@@ -424,7 +424,16 @@ npm run dev        # build in watch mode
 
 ### Debug logging
 
-The bundled logger is on by default. See `utils/logger.ts` / `utils/logger-wrapper.ts`.
+Debug logging turns on automatically in development builds (`import.meta.env.MODE === 'development'`).
+In a production build, enable it at runtime from the browser console:
+
+```js
+localStorage.setItem('LAYOUT_BLOCKS_DEBUG', 'true'); // persists across reloads
+window.LAYOUT_BLOCKS_DEBUG = true;                   // or: current session only
+location.reload();
+```
+
+Logs are prefixed `[LayoutBlocks]`. See `utils/logger.ts` / `utils/logger-wrapper.ts`.
 
 ## Limitations & Not Yet Implemented
 
@@ -453,6 +462,10 @@ The bundled logger is on by default. See `utils/logger.ts` / `utils/logger-wrapp
 
 **Area changes not saving**
 - Saving areas needs admin/schema rights (`PATCH /fields`). See Permissions.
+
+**Still stuck?**
+- Enable [debug logging](#debug-logging) and watch the browser console (logs are prefixed
+  `[LayoutBlocks]`); check the Network tab for failed requests.
 
 ## Roadmap
 
