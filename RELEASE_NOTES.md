@@ -1,144 +1,82 @@
-# Release Notes - v0.0.1-alpha
+# Release Notes — v0.0.5
 
-**Release Date**: June 29, 2024  
-**Status**: Alpha Release  
-**Compatibility**: Directus 10.x
+**Status**: Pre-release (pre-1.0, not yet on npm)
+**Compatibility**: Directus 10.x / 11.x
 
 ---
 
-## 🎉 Introducing Directus Layout Blocks
+## 🎉 Directus Layout Blocks
 
-We're excited to announce the first alpha release of the Directus Layout Blocks interface! This extension brings powerful visual content management capabilities to Directus through an intuitive drag-and-drop interface.
+The Directus Layout Blocks interface brings visual, area-based content management to Directus
+through a drag-and-drop editor built on Many-to-Any (M2A) relationships.
 
-## 🚀 What's New
+## 🚀 Highlights
 
-### Visual Content Management
-Transform how you manage content blocks in Directus with our new visual interface that makes organizing content intuitive and efficient.
+### 📦 Area-based layouts
+- Custom layout areas (Hero, Main, Sidebar, …) with width, icon, and color
+- Per-area constraints: allowed collection types and a maximum item count
+- Lockable areas; automatic handling of orphaned blocks
 
-### Key Features
+### 🎯 Drag & drop
+- Move blocks between areas and reorder within an area (pointer **and** keyboard)
+- Grid and List views
 
-#### 📦 **Area-Based Layouts**
-- Create custom layout areas (Hero, Main Content, Sidebar, etc.)
-- Define constraints per area (max items, allowed content types)
-- Visual width configuration for responsive layouts
-- Lock important areas to prevent accidental deletion
+### 🧩 Flexible & native
+- Works with any collection allowed by the M2A relationship
+- Auto-setup of the junction `area` / `sort` fields
+- **Integrates with Directus' native Save / Discard** — block changes are staged in the form and
+  persisted on Save (no out-of-band writes for the block flow)
+- Permission-aware UI; status display for collections that have a `status` field
 
-#### 🎯 **Drag & Drop Interface**
-- Intuitive drag-and-drop between areas
-- Visual feedback showing valid drop zones
-- Automatic reordering within areas
-- Support for both Grid and List views
+## ⚠️ Status & limitations
 
-#### 🔧 **Flexible Configuration**
-- Works with any Directus collection through M2A relationships
-- Auto-setup of required junction fields
-- Permission-aware interface elements
-- Support for custom status workflows
+This is a **pre-release** (v0.0.5): functional and used in real projects, but not yet published to
+npm, and the configuration surface may still change before a stable 1.0.
 
-#### 🎨 **Modern UI/UX**
-- Responsive design that adapts to screen sizes
-- Dark mode support
-- Empty state indicators
-- Status icons and visual feedback
-- Inline editing capabilities
-
-## ⚠️ Important Notes
-
-### Alpha Status
-This is an **alpha release** intended for testing and feedback. While functional, it's not recommended for production use yet.
-
-### Known Limitations
-
-1. **State Management**: Currently uses direct API calls instead of Directus' native form state management. This will be refactored before v1.0.0.
-
-2. **No npm Package**: This version must be installed manually. npm publishing will come with the beta release.
-
-3. **Performance**: Not yet optimized for large datasets (100+ blocks).
-
-4. **Limited Testing**: Basic functionality is tested, but edge cases may exist.
+Current limitations:
+- **Nested M2A** is detected and loaded by the data layer but has **no nested rendering/editing UI**
+  (only top-level blocks are shown).
+- **Not on npm** — install manually (see below).
+- Not yet tuned for very large block sets.
 
 ## 📦 Installation
 
-### Manual Installation
-
 ```bash
-# 1. Download the extension
 git clone https://github.com/smartlabsAT/directus-layout-blocks.git
-
-# 2. Copy to your Directus extensions folder
-cp -r directus-layout-blocks /path/to/directus/extensions/interfaces/layout-blocks
-
-# 3. Restart Directus
+cp -r directus-layout-blocks /path/to/directus/extensions/directus-extension-layout-blocks
+# then restart Directus
 ```
 
-### Configuration
+Create an M2A field, choose the **Layout Blocks** interface, and configure your areas. See the
+[README](./README.md) for setup, options, and the permissions a non-admin editor role needs.
 
-1. Create an M2A field in your collection
-2. Select "Layout Blocks" as the interface
-3. Configure your areas and constraints
-4. Start managing your content visually!
+## 🛠️ Technical details
 
-## 🛠️ Technical Details
-
-- **Framework**: Vue 3 with Composition API
+- **Framework**: Vue 3 (Composition API)
 - **Language**: TypeScript
-- **Build Tool**: Vite
-- **Styling**: Scoped CSS with Directus theme integration
-- **Architecture**: Modular component-based design
+- **Build**: Vite (Directus Extensions SDK)
+- **Styling**: scoped CSS with Directus theme variables
 
-## 🔮 What's Next
+## 🔮 What's next
 
-### Roadmap to v1.0.0
+- Publish to npm
+- Nested M2A rendering/editing
+- Block templates
+- Performance work for large block sets
 
-- **v0.1.0-beta**: Native state management integration
-- **v0.2.0-beta**: Performance optimizations
-- **v0.3.0-beta**: Enhanced features and UX
-- **v0.5.0-rc**: npm package and documentation
-- **v1.0.0**: Production-ready stable release
+## 🤝 Contributing & support
 
-See our [detailed roadmap](./ROADMAP.md) for more information.
-
-## 🤝 Contributing
-
-We welcome feedback and contributions! This alpha release is an opportunity for the community to help shape the future of this extension.
-
-### How to Help
-
-- **Test** the extension and report bugs
-- **Suggest** features and improvements
-- **Contribute** code via pull requests
-- **Share** your use cases and feedback
-
-### Reporting Issues
-
-Please report bugs and issues on our [GitHub repository](https://github.com/smartlabsAT/directus-layout-blocks/issues).
-
-When reporting issues, please include:
-- Directus version
-- Steps to reproduce
-- Expected vs actual behavior
-- Any error messages
+Feedback and contributions are welcome. Please report bugs on the
+[GitHub repository](https://github.com/smartlabsAT/directus-layout-blocks/issues) and include your
+Directus version, steps to reproduce, expected vs. actual behavior, and any console/network errors.
 
 ## 📚 Documentation
 
-- [README](./README.md) - Getting started guide
-- [ARCHITECTURE](./ARCHITECTURE.md) - Technical deep dive
-- [DEVELOPMENT](./DEVELOPMENT.md) - Development setup
-- [ROADMAP](./ROADMAP.md) - Future plans
-
-## 🙏 Acknowledgments
-
-Special thanks to:
-- The Directus team for their excellent platform
-- Early alpha testers for their valuable feedback
-- Contributors who helped shape this initial release
+- [README](./README.md) — setup, configuration, permissions
+- [CHANGELOG](./CHANGELOG.md) — version history
+- [ARCHITECTURE](./ARCHITECTURE.md) — technical overview
+- [DEVELOPMENT](./DEVELOPMENT.md) — development setup
 
 ## 📝 License
 
-This extension is released under the MIT License.
-
----
-
-**Note**: This is an alpha release. Features may change, and bugs may exist. Use at your own risk and please report any issues you encounter.
-
-Happy content managing! 🎨
+MIT.
