@@ -94,21 +94,28 @@ npm run test
 
 ### 4️⃣ Link to Directus
 
+Directus 11 auto-detects extensions from the `extensions/` directory. Link or copy the **extension
+folder** (which contains `package.json` + `dist/`) — not just `dist/`.
+
 #### Option A: Symlink (Recommended for Development)
 
 ```bash
-# Create symlink to your Directus extensions folder
-ln -s $(pwd)/dist /path/to/directus/extensions/interfaces/layout-blocks
+# Easiest: the SDK link command (pass your Directus path)
+npm run link -- /path/to/directus
 
-# On Windows
-mklink /D "C:\path\to\directus\extensions\interfaces\layout-blocks" "%cd%\dist"
+# Or symlink the extension folder manually (macOS / Linux):
+ln -s "$(pwd)" /path/to/directus/extensions/directus-extension-layout-blocks
+
+# Windows:
+mklink /D "C:\path\to\directus\extensions\directus-extension-layout-blocks" "%cd%"
 ```
 
 #### Option B: Copy Files
 
 ```bash
-# Copy built files to Directus
-cp -r dist/* /path/to/directus/extensions/interfaces/layout-blocks/
+# Copy package.json + dist into a folder under extensions/
+mkdir -p /path/to/directus/extensions/directus-extension-layout-blocks
+cp -r package.json dist /path/to/directus/extensions/directus-extension-layout-blocks/
 
 # Rebuild automatically on changes (npm run dev already watches)
 npm run dev
