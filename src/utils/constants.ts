@@ -17,9 +17,7 @@ export const DEFAULT_OPTIONS = {
   compactMode: false,
   fullWidth: false,
   autoSetup: true,
-  deleteItems: false,
-  enableAreaManagement: false,
-  enableTemplates: false
+  enableAreaManagement: false
 };
 
 export const FIELD_NAME_ALTERNATIVES = {

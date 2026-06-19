@@ -25,15 +25,7 @@ export function validateAreaConfig(area: AreaConfig): string[] {
   if (area.maxItems !== undefined && area.maxItems < 0) {
     errors.push('Max items must be a positive number');
   }
-  
-  if (area.minItems !== undefined && area.minItems < 0) {
-    errors.push('Min items must be a positive number');
-  }
-  
-  if (area.maxItems !== undefined && area.minItems !== undefined && area.minItems > area.maxItems) {
-    errors.push('Min items cannot be greater than max items');
-  }
-  
+
   return errors;
 }
 

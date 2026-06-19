@@ -330,22 +330,6 @@ export default defineInterface({
       }
     },
     {
-      field: 'deleteItems',
-      name: 'Delete Related Items',
-      type: 'boolean',
-      meta: {
-        width: 'half',
-        interface: 'boolean',
-        options: {
-          label: 'Delete the actual items when removing blocks'
-        },
-        note: 'If disabled, only the relation is removed'
-      },
-      schema: {
-        default_value: false
-      }
-    },
-    {
       field: 'autoSetup',
       name: 'Auto Setup Fields',
       type: 'boolean',

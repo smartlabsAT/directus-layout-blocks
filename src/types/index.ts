@@ -10,7 +10,6 @@ export interface LayoutBlocksOptions {
   // Features
   enableDragDrop?: boolean;        // Default: true
   enableAreaManagement?: boolean;  // Default: false
-  enableTemplates?: boolean;       // Default: false
   
   // Display
   viewMode?: 'grid' | 'list';      // Default: 'grid'
@@ -21,7 +20,6 @@ export interface LayoutBlocksOptions {
   // Advanced
   allowedCollections?: string[];   // Limit M2A collections
   maxItemsPerArea?: number;        // Limit per area
-  deleteItems?: boolean;           // Delete items when removing blocks
   autoSetup?: boolean;             // Default: true
 }
 
@@ -32,7 +30,6 @@ export interface AreaConfig {
   color?: string;
   width?: number;           // Width in percent (10-100)
   maxItems?: number;
-  minItems?: number;
   allowedTypes?: string[];
   locked?: boolean;
   hidden?: boolean;
