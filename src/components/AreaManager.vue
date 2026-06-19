@@ -62,9 +62,9 @@
                     >
                       <template #activator="{ toggle, active }">
                         <v-button
+                          v-btn-aria="{ 'aria-label': 'Choose area icon', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                           icon
                           x-small
-                          v-btn-aria="{ 'aria-label': 'Choose area icon', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                           @click="toggle"
                         >
                           <v-icon :name="area.icon || 'dashboard_customize'" />
@@ -74,10 +74,10 @@
                         <v-list-item
                           v-for="choice in AREA_ICON_CHOICES"
                           :key="choice"
+                          v-tooltip="choice"
                           clickable
                           :active="(area.icon || 'dashboard_customize') === choice"
                           class="icon-choice"
-                          v-tooltip="choice"
                           :aria-label="choice"
                           @click="pickAreaIcon(area, choice)"
                         >
@@ -264,10 +264,10 @@
                       >
                         <template #activator="{ toggle, active }">
                           <v-button
+                            v-btn-aria="{ 'aria-label': 'Add allowed collection', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                             x-small
                             icon
                             secondary
-                            v-btn-aria="{ 'aria-label': 'Add allowed collection', 'aria-haspopup': 'menu', 'aria-expanded': active }"
                             @click="toggle"
                           >
                             <v-icon name="add" />
@@ -331,7 +331,7 @@
         <EmptyState
           v-else
           icon="dashboard_customize"
-          message='No areas defined yet — use "Add area" to create one.'
+          message="No areas defined yet — use &quot;Add area&quot; to create one."
         />
 
         <!-- Communicates the one non-obvious lock effect: locking also freezes the
