@@ -45,7 +45,6 @@ export default defineConfig({
     hookTimeout: 10000,
     teardownTimeout: 10000,
     isolate: true,
-    threads: true,
     mockReset: true,
     restoreMocks: true,
     clearMocks: true

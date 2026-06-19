@@ -43,7 +43,7 @@ vi.mock('@directus/extensions-sdk', () => ({
 
 // Mock M2AHelper
 vi.mock('../../../src/utils/m2a-helper', () => ({
-  M2AHelper: vi.fn().mockImplementation(() => mockM2AHelper)
+  M2AHelper: vi.fn(function () { return mockM2AHelper; })
 }));
 
 // Now import the module after mocks are set up
@@ -61,7 +61,7 @@ describe('useBlocks Composable (global-save / state-based)', () => {
     // implementations before each test — re-establish the M2AHelper constructor
     // so `new M2AHelper()` keeps returning our stub.
     (M2AHelper as unknown as { mockImplementation: (fn: () => any) => void })
-      .mockImplementation(() => mockM2AHelper);
+      .mockImplementation(function () { return mockM2AHelper; });
     mockM2AHelper.loadM2AData.mockResolvedValue([]);
 
     junctionInfo = computed(() => ({
