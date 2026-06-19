@@ -42,7 +42,7 @@ Before you begin development, ensure you have:
 
 - **Node.js** 18.0 or higher
 - **npm** or **yarn** package manager
-- **Directus** 10.x development instance
+- **Directus** 10.x / 11.x development instance
 - **Git** for version control
 - **TypeScript** knowledge (recommended)
 - **Vue 3** experience (recommended)
@@ -89,7 +89,7 @@ npm run dev
 npm run build
 
 # Run tests
-npm test
+npm run test
 ```
 
 ### 4️⃣ Link to Directus
@@ -110,8 +110,8 @@ mklink /D "C:\path\to\directus\extensions\interfaces\layout-blocks" "%cd%\dist"
 # Copy built files to Directus
 cp -r dist/* /path/to/directus/extensions/interfaces/layout-blocks/
 
-# Watch and copy automatically
-npm run dev -- --watch
+# Rebuild automatically on changes (npm run dev already watches)
+npm run dev
 ```
 
 ### 5️⃣ Configure Directus
@@ -154,13 +154,13 @@ hotfix/*      # Urgent fixes
 npm run dev
 
 # Run type checking
-npm run typecheck
+npm run type-check
 
 # Run linting
 npm run lint
 
 # Run tests
-npm test
+npm run test
 
 # Build for production
 npm run build
@@ -186,11 +186,11 @@ layout-blocks/
 │   │   └── 🔄 StatusSelector.vue # Status control
 │   │
 │   ├── 📁 composables/           # Vue composables
-│   │   ├── 🔧 useAutoSetup.ts    # Auto configuration
-│   │   ├── 📦 useBlocks.ts       # Block operations
-│   │   ├── 🎯 useDragDrop.ts    # Drag functionality
-│   │   ├── 🔍 useJunctionDetection.ts # M2A detection
-│   │   └── 🔐 usePermissions.ts # Permission checks
+│   │   ├── 🔧 useAutoSetup.ts        # Auto configuration
+│   │   ├── 📦 useBlocks.ts           # Block state + emit
+│   │   ├── ⌨️ useKeyboardDnd.ts      # Keyboard drag & drop
+│   │   ├── 🔐 useBlockPermissions.ts # Per-action permissions
+│   │   └── 🔐 usePermissions.ts      # Permission lookup
 │   │
 │   ├── 📁 config/               # Configuration
 │   │   └── 🏗️ areas.ts          # Area presets
@@ -290,7 +290,7 @@ const DEFAULT_AREA = 'main'
 
 // Prefix composables with 'use'
 function useBlocks() { }
-function useDragDrop() { }
+function useKeyboardDnd() { }
 ```
 
 #### 2️⃣ File Organization

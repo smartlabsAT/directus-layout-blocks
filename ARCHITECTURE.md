@@ -65,16 +65,17 @@ layout-blocks/
 │   │   ├── ListView.vue       # List/table view
 │   │   └── StatusSelector.vue # Status dropdown component
 │   ├── composables/
-│   │   ├── useAutoSetup.ts    # Auto-configure junction fields
-│   │   ├── useBlocks.ts       # Block CRUD operations
-│   │   ├── useDragDrop.ts     # Drag & drop logic
-│   │   ├── useJunctionDetection.ts # M2A structure detection
-│   │   └── usePermissions.ts  # Permission checking
+│   │   ├── useAutoSetup.ts        # Auto-configure junction fields
+│   │   ├── useBlocks.ts           # Block state + emit serialization
+│   │   ├── useBlockPermissions.ts # Per-action permission helpers
+│   │   ├── useKeyboardDnd.ts      # Keyboard drag & drop
+│   │   └── usePermissions.ts      # Permission lookup
 │   ├── config/
 │   │   └── areas.ts           # Default area configurations
 │   ├── types/
 │   │   └── index.ts           # TypeScript definitions
 │   └── utils/
+│       ├── m2a-helper.ts      # M2A structure detection + data loading
 │       ├── blockHelpers.ts    # Block utility functions
 │       ├── constants.ts       # App constants
 │       ├── logger.ts          # Debug logging
@@ -171,10 +172,10 @@ interface LayoutBlocksOptions {
 
 ### 🎯 Current Implementation
 
-> ⚠️ **Alpha Version Note**: The current implementation uses direct API calls instead of Directus' native state management. This will be refactored in v0.2.0.
+> **State model**: Block changes are staged in component state and emitted to the Directus form; native Save / Discard persists or reverts them. (Earlier alpha versions wrote directly via the API — shown below for contrast and **no longer used**.)
 
 ```typescript
-// Current approach (v0.0.1-alpha)
+// Earlier approach (pre-native-Save) — no longer used:
 async function createBlock(area: string, collection: string, itemData: any) {
   // Direct API call
   const { data: item } = await api.post(`/items/${collection}`, itemData)
@@ -191,7 +192,7 @@ async function createBlock(area: string, collection: string, itemData: any) {
   await api.post(`/items/${junctionCollection}`, junctionData)
 }
 
-// Target approach (v1.0.0)
+// Current approach (v0.0.5): stage + emit, persisted by Directus' Save
 function createBlock(area: string, collection: string, itemData: any) {
   const newBlock = {
     collection,
@@ -424,7 +425,7 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
 
 ## 💾 State Management Details
 
-### Current State Management (v0.0.1-alpha)
+### Earlier State Management (pre-native-Save — no longer used)
 
 ```typescript
 // Component-level state management
@@ -455,7 +456,7 @@ async function updateBlock(id: string, changes: Partial<BlockItem>) {
 }
 ```
 
-### Target State Management (v1.0.0)
+### Current State Management (native Save integration)
 
 ```typescript
 // Integration with Directus form state
@@ -926,31 +927,14 @@ const { transform } = useBlockTransform()
 
 ---
 
-## 🔮 Future Architecture (v1.0.0)
+## 🔮 Future Architecture
 
-### Planned Improvements
+Native state integration (form Save / Discard), dirty-state tracking, and keyboard navigation are
+**already implemented** — see State Management above. Remaining ideas under consideration:
 
-1. **Native State Integration**
-   - Full integration with Directus form state
-   - Automatic save/revert support
-   - Dirty state tracking
-
-2. **Performance Enhancements**
-   - Virtual scrolling for large datasets
-   - Lazy loading of block content
-   - Optimized re-renders
-
-3. **Enhanced Features**
-   - Undo/redo system
-   - Block templates
-   - Keyboard navigation
-   - Bulk operations
-
-4. **Better Developer Experience**
-   - Comprehensive TypeScript types
-   - Plugin system for custom blocks
-   - Extensive documentation
-   - CLI tools
+1. **Performance** — virtual scrolling / lazy loading for very large block sets; optimized re-renders.
+2. **Enhanced editing** — undo/redo, block templates, bulk operations, and nested M2A rendering.
+3. **Developer experience** — a plugin system for custom block types and richer TypeScript types.
 
 ---
 
