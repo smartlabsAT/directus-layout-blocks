@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes at this time._
+Substantial work has landed since `v0.0.5` (the redesign epic and its follow-ups) but has not yet been tagged as a release.
+
+### Added
+- **Full Width** interface option to render the editor across the full form width.
+- Keyboard drag & drop, arrow-key focus navigation between blocks, focus rings, ARIA roles, and reduced-motion support (accessibility pass).
+- AreaManager: icon picker, lock/unlock, delete confirmation, and per-collection icons.
+- Redesigned block-creation wizard (create / link existing / duplicate existing) and a native-choice delete dialog.
+
+### Changed
+- **Block changes now persist through Directus' native Save / Discard** (global Save integration) instead of direct API calls — changes are staged in the form and written on Save; Discard reloads from the database.
+- Full UI redesign to the Directus design language: interface shell, toolbar, ListView (segmented tabs + tokenized table), BlockItem, and AreaManager.
+- Theme QA across light / dark / custom primary; shared drag preview and shared components from `expandable-blocks` (incl. ItemSelector integration).
+- Compatibility: Directus **10.x and 11.x**.
+
+### Removed
+- Unused interface options `deleteItems` and `enableTemplates`, and the unused `AreaConfig.minItems`.
+- Stale documentation: `TROUBLESHOOTING.md` and `ROADMAP.md`.
+
+### Fixed
+- Directus 11 admin check; numerous keyboard / focus / ARIA issues; toolbar sticky-shadow behavior.
+
+### Docs
+- README overhauled to match the current code (options, permissions, save model, limitations); RELEASE_NOTES updated.
+
+## [0.0.5] - 2025-09-04
+
+Maintenance release: removed E2E tests that required a running Directus instance (CI stability).
+
+## [0.0.4] - 2025-09-02
+
+Maintenance release (version bump).
+
+## [0.0.3] - 2025-09-02
+
+### Added
+- Dependency on `expandable-blocks` for shared components and ItemSelector integration.
+
+## [0.0.2-alpha] - 2025-08-28
+
+### Added
+- Proper logger system (replacing raw console statements); quality tooling and GitHub workflows.
 
 ## [0.0.1-alpha] - 2024-06-29
 
