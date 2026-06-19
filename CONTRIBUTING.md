@@ -59,8 +59,8 @@ Before creating bug reports, please check existing issues to avoid duplicates.
 6. **Screenshots** - If applicable
 7. **Environment details**:
    ```
-   - Directus Version: 10.x.x
-   - Extension Version: 0.0.1-alpha
+   - Directus Version: 10.x.x or 11.x.x
+   - Extension Version: 0.0.5
    - Browser: Chrome 120
    - OS: macOS 14.0
    ```
@@ -525,7 +525,7 @@ We follow [Semantic Versioning](https://semver.org/):
 
 - [Architecture Guide](./ARCHITECTURE.md)
 - [Development Guide](./DEVELOPMENT.md)
-- [API Reference](./API.md)
+- [README](./README.md) — setup, configuration, options & API reference
 
 ### Learning Resources
 

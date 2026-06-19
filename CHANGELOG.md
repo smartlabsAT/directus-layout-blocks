@@ -37,7 +37,7 @@ Maintenance release: removed E2E tests that required a running Directus instance
 
 ## [0.0.4] - 2025-09-02
 
-Maintenance release (version bump).
+No functional changes (version bump).
 
 ## [0.0.3] - 2025-09-02
 
@@ -49,7 +49,11 @@ Maintenance release (version bump).
 ### Added
 - Proper logger system (replacing raw console statements); quality tooling and GitHub workflows.
 
-## [0.0.1-alpha] - 2024-06-29
+## [0.0.1] - 2025-08-28
+
+Initial logger-system release (same line of work as 0.0.2-alpha).
+
+## [0.0.1-alpha] - 2025-07-15
 
 **Initial alpha release** 🎉
 

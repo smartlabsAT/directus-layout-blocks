@@ -112,7 +112,7 @@ graph TD
     
     D --> D1[BlockCreator]
     D --> D2[AreaManager]
-    D --> D3[Block Editor]
+    D --> D3[DeleteConfirmationDialog]
 ```
 
 ### ⚡ Key Technologies
@@ -186,19 +186,19 @@ async function createBlock(area: string, collection: string, itemData: any) {
     [collectionField]: collection,
     [itemField]: item.id,
     area,
-    sort: getNextSort(area)
+    sort: nextSortFor(area)
   }
   
   await api.post(`/items/${junctionCollection}`, junctionData)
 }
 
 // Current approach (v0.0.5): stage + emit, persisted by Directus' Save
-function createBlock(area: string, collection: string, itemData: any) {
+function addBlock(area: string, collection: string, itemData: any) {
   const newBlock = {
     collection,
     item: itemData,
     area,
-    sort: getNextSort(area)
+    sort: nextSortFor(area)
   }
   
   // Emit to Directus form state
@@ -287,13 +287,11 @@ sequenceDiagram
     U->>BC: Select collection type
     BC->>U: Show item form
     U->>BC: Fill and submit
-    BC->>B: Create block request
-    B->>API: POST content item
-    API-->>B: Return item ID
-    B->>API: POST junction record
-    API-->>B: Return junction
-    B->>I: Update local state
-    I->>U: Show new block
+    BC->>B: Add block request
+    B->>B: Stage block (temp id) in local state
+    B->>I: emit('input', prepareItemsForEmit())
+    I->>U: Show new block (unsaved)
+    Note over I,API: Directus' Save persists the emitted M2A value (junction + item)
 ```
 
 ### 3️⃣ Drag & Drop Flow
@@ -405,7 +403,7 @@ graph TD
 function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   // Check max items
   if (area.maxItems) {
-    const currentCount = getBlocksInArea(area.id).length
+    const currentCount = getBlocksForArea(area.id).length
     if (currentCount >= area.maxItems) return false
   }
   
@@ -459,21 +457,18 @@ async function updateBlock(id: string, changes: Partial<BlockItem>) {
 ### Current State Management (native Save integration)
 
 ```typescript
-// Integration with Directus form state
-const { value, disabled } = toRefs(props)
+// Block state is staged locally and emitted to the Directus form.
+// See src/composables/useBlocks.ts for the exact implementation.
+const blocks = ref<BlockItem[]>([])
+const dirtyIds = ref<Set<BlockId>>(new Set())
 
-// Computed value that maintains form integration
-const blocks = computed({
-  get: () => transformToBlocks(value.value),
-  set: (newBlocks) => emit('input', transformFromBlocks(newBlocks))
-})
+// Any change re-emits the serialized M2A value; Directus' Save persists it.
+watch(blocks, () => emit('input', prepareItemsForEmit()), { deep: true })
 
-// All changes through emit
-function updateBlock(id: string, changes: Partial<BlockItem>) {
-  const updated = blocks.value.map(block => 
-    block.id === id ? { ...block, ...changes } : block
-  )
-  blocks.value = updated // Triggers emit
+function updateBlock(id: BlockId, changes: Partial<BlockItem>) {
+  const block = blocks.value.find(b => b.id === id)
+  Object.assign(block, changes)
+  markBlockDirty(id) // included in the next emit; written on Save
 }
 ```
 
@@ -760,7 +755,7 @@ logger.info('Drag validation:', {
   targetArea: targetArea.id,
   canDrop: canDropInArea(draggedBlock, targetArea),
   maxItems: targetArea.maxItems,
-  currentCount: getBlocksInArea(targetArea.id).length
+  currentCount: getBlocksForArea(targetArea.id).length
 })
 ```
 
@@ -817,9 +812,9 @@ describe('Area Validation', () => {
 // Example: Block creation flow
 describe('Block Creation', () => {
   it('should create block with correct area assignment', async () => {
-    const { createBlock } = useBlocks()
+    const { addBlock } = useBlocks()
     
-    const result = await createBlock('main', 'content_text', {
+    const result = await addBlock('main', 'content_text', {
       title: 'Test Block',
       content: 'Test content'
     })
@@ -906,7 +901,7 @@ interface ApiResponse<T> {
 ### 4. Composable Organization
 
 ```typescript
-// Single responsibility composables
+// Single responsibility composables (illustrative pattern — not actual files in this repo)
 export function useBlockValidation() {
   // Only validation logic
 }
