@@ -359,7 +359,7 @@ function handleItemsLinked(items: any[]) {
     emit('link', {
       area: localArea.value,
       collection: selectedCollection.value,
-      items: items
+      items
     });
 
     // Close both ItemSelector and BlockCreator
@@ -375,7 +375,7 @@ function handleItemsDuplicated(items: any[]) {
     emit('duplicate', {
       area: localArea.value,
       collection: selectedCollection.value,
-      items: items
+      items
     });
 
     // Close both ItemSelector and BlockCreator

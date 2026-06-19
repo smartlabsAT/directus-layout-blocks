@@ -172,7 +172,12 @@
                   small
                   :style="getAreaChipStyle(block)"
                 >
-                  <v-icon v-if="getAreaForBlock(block)?.icon" :name="getAreaForBlock(block).icon" x-small left />
+                  <v-icon
+                    v-if="getAreaForBlock(block)?.icon"
+                    :name="getAreaForBlock(block).icon"
+                    x-small
+                    left
+                  />
                   {{ getAreaForBlock(block)?.label || block.area }}
                 </v-chip>
                 <v-chip v-else small class="orphaned-chip">
@@ -685,7 +690,7 @@ function handleAreaDrop(event: DragEvent, targetAreaId: string) {
   
   // Emit move event
   emit('move-block', {
-    blockId: blockId,
+    blockId,
     fromArea: sourceArea,
     toArea: targetAreaId,
     toIndex: 999 // Put at end of target area

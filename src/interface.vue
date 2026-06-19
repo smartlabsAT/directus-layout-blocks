@@ -78,10 +78,10 @@
           <v-menu v-if="computedAreas.length" show-arrow placement="bottom">
             <template #activator="{ toggle, active }">
               <v-button
+                v-btn-aria="{ 'aria-haspopup': 'menu', 'aria-expanded': active }"
                 secondary
                 small
                 class="area-select"
-                v-btn-aria="{ 'aria-haspopup': 'menu', 'aria-expanded': active }"
                 @click="toggle"
               >
                 <v-icon
@@ -264,17 +264,15 @@
         @cancel="handleDrawerCancel"
         @esc="handleDrawerCancel"
       >
-
-        
         <div class="drawer-content">
           <!-- Directus native v-form component -->
           <v-form
             v-if="editingCollection && editingId"
             ref="editForm"
+            v-model="editingValues"
             :collection="editingCollection"
             :primary-key="String(editingId)"
             :initial-values="editingValues"
-            v-model="editingValues"
           />
         </div>
         
@@ -282,7 +280,7 @@
           <v-button secondary @click="handleDrawerCancel">
             Cancel
           </v-button>
-          <v-button @click="saveBlockDirectly" :loading="editSaving">
+          <v-button :loading="editSaving" @click="saveBlockDirectly">
             Save
           </v-button>
         </template>
