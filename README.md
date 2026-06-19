@@ -2,199 +2,166 @@
 
 <div align="center">
 
-![Alpha Version](https://img.shields.io/badge/status-alpha-orange.svg)
-![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue.svg)
-![Directus](https://img.shields.io/badge/directus-10.x-64f.svg)
+![Pre-release](https://img.shields.io/badge/status-pre--release-orange.svg)
+![Version](https://img.shields.io/badge/version-0.0.5-blue.svg)
+![Directus](https://img.shields.io/badge/directus-10.x%20%7C%2011.x-64f.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 </div>
 
-> [!WARNING]
-> **ALPHA VERSION** - This extension is currently in alpha state (v0.0.1)
-> 
-> While each release is functional and tested, this is not yet published to npm and is under active development.
-> 
-> **Current Limitation**: Block creation and editing currently uses direct API requests instead of Directus' native state management system. This will be refactored before the first stable release (v1.0.0).
+> [!NOTE]
+> **Pre-release (v0.0.5).** The extension is functional and integrates with Directus' native
+> Save/Discard system. It is not yet published to npm and the configuration surface may still
+> change before a stable 1.0 release. Read the [Limitations](#limitations--not-yet-implemented)
+> section before relying on it in production.
 
 ---
 
-A powerful and flexible interface for managing content blocks in different layout areas within Directus. This extension allows you to create dynamic, block-based layouts with drag-and-drop functionality, area management, and visual organization of content.
+A flexible Directus **interface** for arranging content blocks into named **layout areas**.
+It turns a Many-to-Any (M2A) relationship into a visual, drag-and-drop block editor: you define
+areas (e.g. *Hero*, *Main*, *Sidebar*), drop blocks of any allowed collection into them, reorder
+them, and the order + area assignment are stored on the relationship's junction records.
 
 ## Table of Contents
 
-- [Current Status](#current-status)
-- [Roadmap](#roadmap)
-- [Features](#features)
+- [What You Get](#what-you-get)
+- [How It Works (Architecture)](#how-it-works-architecture)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [How Saving Works](#how-saving-works)
+- [Permissions & Production Setup](#permissions--production-setup)
 - [Usage Guide](#usage-guide)
-- [Architecture Documentation](#architecture-documentation)
+- [Project Structure](#project-structure)
 - [API Reference](#api-reference)
 - [Development Guide](#development-guide)
+- [Limitations & Not Yet Implemented](#limitations--not-yet-implemented)
 - [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
-## Current Status
+## What You Get
 
-### Version: 0.0.1-alpha
+- **Visual block management** — Grid and List views for organizing content blocks.
+- **Layout areas** — Define custom areas (Hero, Main, Sidebar, …) with width, icon, color, and constraints.
+- **Drag & drop** — Move blocks between areas and reorder within an area; keyboard drag-and-drop is supported.
+- **Add by create / link / duplicate** — Add a new block inline, **link an existing** item, or **duplicate** one — via a guided wizard.
+- **Any collection** — Works with any collections allowed by your M2A relationship.
+- **Area constraints** — Per-area allowed collection types and a maximum item count; lockable areas.
+- **Orphaned blocks** — Blocks whose area no longer exists are collected in a system "Orphaned" area so nothing is lost.
+- **Status display** — Shows a block's `status` (Published / Draft / Archived) when the collection has a status field.
+- **Native Save integration** — All block changes flow through Directus' standard Save / Save & Stay / Discard.
+- **Permission-aware** — Honors the acting user's Directus permissions for the involved collections.
 
-> [!CAUTION]
-> This extension is currently in **alpha stage**. While functional and tested, it's not yet ready for production use.
+## How It Works (Architecture)
 
-#### ✅ What Works
-- Block creation, editing, and deletion
-- Drag & drop between areas
-- Area management and constraints
-- Visual grid and list views
-- Status management
-- Permission checking
-- Orphaned block handling
+Three layers are involved. **You create only one field by hand** — the rest is provided by
+Directus or by the extension's auto-setup.
 
-#### ⚠️ Current Limitations
-- **API-based state management**: Currently uses direct API calls instead of Directus' native form state management
-- **No npm package**: Must be installed manually
-- **Limited testing**: Only tested with Directus 10.x
+| Layer | Created by | What it is |
+|-------|-----------|------------|
+| **M2A alias field** on your parent collection (e.g. `pages.blocks`) | **You (admin)** | A relational *alias* field (`localType: m2a`). This is where you choose the **Layout Blocks** interface. |
+| **Junction collection** (e.g. `pages_blocks`) | **Directus** (automatically) | Stores one row per block: a foreign key to the parent, plus the polymorphic `item` + `collection` pair. |
+| **`area` + `sort` fields** on the junction | **The extension** (`autoSetup`, on by default) | `area` (string) = which layout area the block belongs to; `sort` (integer) = order within that area. |
 
-#### 🚧 Known Issues
-- State changes require manual API calls
-- No integration with Directus' save/revert system
-- Performance could be optimized for large datasets
+> **Important:** `area` and `sort` live on the **junction records**, not on the parent item. The
+> extension reads the allowed block collections from the M2A relation
+> (`relation.meta.one_allowed_collections`).
 
-## Roadmap
+### Data layout (where blocks live)
 
-### v0.1.0 - Beta Release (Target: Q3 2025)
-- [ ] Refactor to use Directus native state management
-- [ ] Integration with Directus form save/revert system
-- [ ] Performance optimizations
-- [ ] Comprehensive test suite
+Blocks are rows in the junction table. For example, a `pages` item with five blocks across three areas:
 
-### v0.5.0 - Release Candidate (Target: Q3 2025)
-- [ ] npm package publication
-- [ ] Enhanced documentation
-- [ ] Migration guide from alpha versions
-- [ ] Community feedback integration
+| id  | pages_id | item | collection    | area    | sort |
+|-----|----------|------|---------------|---------|------|
+| 101 | 1        | 501  | content_hero  | hero    | 0    |
+| 102 | 1        | 601  | content_text  | main    | 0    |
+| 103 | 1        | 602  | content_text  | main    | 1    |
+| 104 | 1        | 51   | content_image | sidebar | 0    |
 
-### v1.0.0 - Stable Release (Target: Q4 2025)
-- [ ] Production-ready state management
-- [ ] Full Directus integration
-- [ ] Stable API
-- [ ] Performance benchmarks
-- [ ] Security audit
-
-See [ROADMAP.md](./ROADMAP.md) for detailed development plans.
-
-## Features
-
-- **Visual Block Management**: Grid and List views for organizing content blocks
-- **Drag & Drop**: Intuitive drag-and-drop interface for moving blocks between areas
-- **Flexible Areas**: Define custom layout areas with specific rules and constraints
-- **Content Type Support**: Works with any Directus collection through M2A (Many-to-Any) relationships
-- **Area Constraints**: Set allowed content types and maximum items per area
-- **Orphaned Blocks**: Automatic handling of blocks when areas are removed or rules change
-- **Status Management**: Built-in status workflow (Published, Draft, Archived)
-- **Responsive Design**: Adapts to different screen sizes and layouts
-- **Permission Support**: Respects Directus user permissions for create, read, update, delete
+Each row is one block: `item` + `collection` point to the content item, `area` is its layout
+region, and `sort` orders it within that area. Adding, moving, or reordering blocks adds/updates
+rows here.
 
 ## Installation
 
 ### Prerequisites
 
-- Directus 10.x or higher
-- A Many-to-Any (M2A) field in your collection
+- Directus **10.x or 11.x** (`host: ^10.0.0 || ^11.0.0`).
+- A Many-to-Any (M2A) field in the collection you want to lay out.
 
 ### Installation Steps
 
-1. Copy the extension to your Directus extensions folder:
-```bash
-cp -r layout-blocks /path/to/directus/extensions/interfaces/
-```
-
-2. Restart Directus to load the extension
-
-3. The extension will appear as "Layout Blocks" when configuring an M2A interface
+1. Build the extension (produces `dist/index.js`):
+   ```bash
+   npm install
+   npm run build
+   ```
+2. Copy the extension into your Directus `extensions/` directory, e.g.
+   `extensions/directus-extension-layout-blocks/` (Directus auto-detects bundled extensions there).
+3. Restart Directus. The interface appears as **"Layout Blocks"** when configuring an M2A field.
 
 ## Quick Start
 
-### 1. Create a Many-to-Any Field
+### 1. Create a Many-to-Any field
 
-First, create an M2A field in your collection (e.g., `pages`):
+Create an M2A field on your collection (e.g. `pages`) and configure its **Allowed Collections**
+(the content types that may be used as blocks):
 
 ```javascript
-// Example field configuration
+// Field definition (the standard Directus M2A field)
 {
-  field: 'content_blocks',
+  field: 'blocks',
   type: 'alias',
   meta: {
-    interface: 'list-m2a',
-    special: ['m2a'],
-    options: {
-      // Will be replaced with layout-blocks interface
-    }
+    interface: 'list-m2a',   // standard M2A interface (changed to layout-blocks in step 2)
+    special: ['m2a']
   }
 }
 ```
 
-### 2. Configure Layout Blocks Interface
+> If you do not configure allowed collections on the relation, the interface shows a warning and
+> lets you enter collection names manually in the options.
 
-After creating the M2A field, edit it and change the interface to "Layout Blocks":
+### 2. Switch the interface to "Layout Blocks"
+
+Edit the field and change its interface to `layout-blocks`, then configure areas:
 
 ```javascript
 {
   interface: 'layout-blocks',
   options: {
-    enableAreaManagement: true,
+    enableAreaManagement: true,   // optional: let editors manage areas (admin/schema rights — see Permissions)
     areas: [
-      {
-        id: 'hero',
-        label: 'Hero Section',
-        icon: 'panorama',
-        maxItems: 1,
-        allowedTypes: ['content_hero', 'content_video']
-      },
-      {
-        id: 'main',
-        label: 'Main Content',
-        icon: 'article',
-        width: 66
-      },
-      {
-        id: 'sidebar',
-        label: 'Sidebar',
-        icon: 'view_sidebar',
-        width: 33,
-        allowedTypes: ['content_text', 'content_image', 'content_cta']
-      }
+      { id: 'hero',    label: 'Hero Section', icon: 'panorama',     maxItems: 1, allowedTypes: ['content_hero', 'content_video'] },
+      { id: 'main',    label: 'Main Content', icon: 'article',      width: 66 },
+      { id: 'sidebar', label: 'Sidebar',      icon: 'view_sidebar', width: 33, allowedTypes: ['content_text', 'content_image', 'content_cta'] }
     ]
   }
 }
 ```
 
-### 3. Create Content Collections
+### 3. Create your content (block) collections
 
-Create collections for your content blocks:
+Each allowed collection is a normal Directus collection. A `status` field is optional — if present,
+its value is shown on the block.
 
 ```sql
--- Example: content_hero collection
+-- Example: a "hero" block collection
 CREATE TABLE content_hero (
-  id serial PRIMARY KEY,
-  status varchar(20) DEFAULT 'draft',
-  title varchar(255),
-  subtitle text,
-  image uuid REFERENCES directus_files(id),
+  id          serial PRIMARY KEY,
+  status      varchar(20) DEFAULT 'draft',
+  title       varchar(255),
+  subtitle    text,
+  image       uuid REFERENCES directus_files(id),
   button_text varchar(100),
   button_link varchar(500)
 );
-
--- Example: content_text collection
-CREATE TABLE content_text (
-  id serial PRIMARY KEY,
-  status varchar(20) DEFAULT 'draft',
-  title varchar(255),
-  content text
-);
 ```
+
+On first open, the extension creates the `area` and `sort` fields on the junction automatically
+(requires admin/schema rights — see [Permissions](#permissions--production-setup)).
 
 ## Configuration
 
@@ -202,329 +169,314 @@ CREATE TABLE content_text (
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `viewMode` | `'grid' \| 'list'` | `'grid'` | Default view mode |
-| `showEmptyAreas` | `boolean` | `true` | Show areas without blocks |
-| `enableDragDrop` | `boolean` | `true` | Enable drag and drop functionality |
-| `enableAreaManagement` | `boolean` | `true` | Allow users to manage areas |
-| `compactMode` | `boolean` | `false` | Use compact display mode |
-| `autoSetup` | `boolean` | `true` | Auto-create required junction fields |
-| `areaField` | `string` | `'area'` | Junction field name for area assignment |
-| `sortField` | `string` | `'sort'` | Junction field name for sorting |
-| `areas` | `AreaConfig[]` | `[]` | Predefined area configurations |
+| `viewMode` | `'grid' \| 'list'` | `'grid'` | Initial view mode. |
+| `compactMode` | `boolean` | `false` | Denser block layout. |
+| `fullWidth` | `boolean` | `false` | Render the editor across the **full form width** (breaks out of the form column; padding preserved). |
+| `enableDragDrop` | `boolean` | `true` | Enable drag-and-drop reordering / moving. |
+| `showEmptyAreas` | `boolean` | `true` | Show areas that contain no blocks. |
+| `enableAreaManagement` | `boolean` | `false` | Show the **Manage Areas** UI. Saving areas writes the field's options → **requires admin/schema rights**. |
+| `areas` | `AreaConfig[]` | `[{ id: 'main', label: 'Main Content', icon: 'inbox', width: 100 }]` | The available layout areas (see below). |
+| `defaultArea` | `string` | `'main'` | Area assigned to new blocks. |
+| `areaField` | `string` | `'area'` | Junction field name holding the area id. |
+| `sortField` | `string` | `'sort'` | Junction field name holding the sort order. |
+| `autoSetup` | `boolean` | `true` | Auto-create the `area`/`sort` fields on the junction. **Requires admin/schema rights** (see Permissions). |
+| `allowedCollections` | `string[]` | *(unset)* | Restrict blocks to a subset of the M2A's allowed collections. Empty = all allowed collections. |
+| `maxItemsPerArea` | `integer` | *(unset)* | Global cap on blocks per area. A per-area `maxItems` takes precedence. |
 
 ### Area Configuration
 
-Each area can be configured with:
+Each entry in `areas` is an `AreaConfig`. These properties are configurable via the area editor:
 
 ```typescript
 interface AreaConfig {
-  id: string;              // Unique area identifier
+  id: string;              // Unique area identifier (e.g. 'main')
   label: string;           // Display name
-  icon?: string;           // Material icon name
-  width?: number;          // Width percentage (25, 33, 50, 66, 75, 100)
-  maxItems?: number;       // Maximum blocks allowed
-  allowedTypes?: string[]; // Allowed collection names
-  locked?: boolean;        // Prevent area deletion
-  color?: string;          // Custom color (hex)
+  icon?: string;           // Material Symbols icon name
+  color?: string;          // Accent color (hex)
+  width?: number;          // Layout width in percent (e.g. 25, 33, 50, 66, 75, 100)
+  maxItems?: number;       // Maximum blocks in this area
+  allowedTypes?: string[]; // Restrict this area to specific collection names
 }
 ```
 
+> `AreaConfig` also declares `locked`, `hidden`, and `isDefault`, which are used internally
+> (e.g. for the system "Orphaned" area) and have no editor fields.
+
+**Locked areas** show no "add block" button, cannot be edited in the Area Manager, and their blocks
+cannot be dragged out. The system "Orphaned" area is the exception: it is always locked but lets
+blocks leave so you can rescue them into a valid area.
+
+## How Saving Works
+
+The editor integrates with Directus' **native Save** — it does **not** persist block changes
+behind the form's back.
+
+- **Staged via the form (persist on Save):** adding, editing (including block field edits made in
+  the drawer and status changes), moving, reordering, linking, duplicating, and removing blocks all
+  update the field value in memory and `emit('input', …)`.
+  They are written when the user clicks **Save** / **Save & Stay**, and reverted by **Discard**
+  (the editor reloads from the database). Unsaved blocks carry a temporary id
+  (`new_…`, `dup_…`, `existing_…`) until Save resolves them to real keys.
+- **Immediate, direct API (outside the form Save):**
+  - `autoSetup` field creation — `POST /fields/{junction}` (one-time, on init).
+  - Area-management persistence — `PATCH /fields/{collection}/{field}` (when you save areas).
+  - Hard delete via the **Delete everywhere** action (requires `delete` permission) — `DELETE /items/{collection}/{id}`.
+  - Reads — initial block load and the fetch used when linking/duplicating an existing item.
+
+## Permissions & Production Setup
+
+Two operations require **admin / schema access** because they modify the data model
+(Directus restricts `directus_fields` / `directus_collections` to admins):
+
+- **`autoSetup`** → `POST /fields/{junction}` (creates `area`/`sort`).
+- **`enableAreaManagement`** (saving areas) → `PATCH /fields/{collection}/{field}`.
+
+**Recommended for non-admin editors:** have an admin open each collection once (so `area`/`sort`
+get provisioned and areas are configured), then set `autoSetup: false` and
+`enableAreaManagement: false` for the editor-facing configuration. Otherwise a non-admin opening a
+not-yet-provisioned field hits a 403 and the interface shows a setup error.
+
+**Permissions an editor (non-admin) role needs:**
+
+| Collection | read | create | update | delete |
+|-----------|:----:|:------:|:------:|:------:|
+| Junction (`<parent>_<field>`) | ✅ | ✅ | ✅ | ✅ |
+| Each allowed block collection | ✅ | ✅¹ | ✅¹ | ✅¹ |
+| Parent collection | ✅ | — | ✅ | — |
+
+¹ Only needed if editors should create / edit / delete the underlying items (not just link or view them).
+
+> **Security:** Do not grant blanket `create` / all-fields permission on the junction. Scope the
+> junction's `collection` field with a permission **validation rule** (`{ collection: { _in: [ …allowed types ] } }`),
+> otherwise editors can point relations at arbitrary collections and bypass the permissions of the
+> related collections.
+
+### Manual setup (when `autoSetup: false`)
+
+Create these two fields on the junction collection yourself:
+
+- **`area`** — type `string` (varchar, length 64), not nullable, default = your `defaultArea` (e.g. `main`).
+- **`sort`** — type `integer`, not nullable, default `0`.
+
+(If `areaField` / `sortField` are customized, use those names instead.)
+
 ## Usage Guide
 
-### Managing Areas
+### Managing areas
 
-1. Click the "Manage Areas" button in the toolbar
-2. Add new areas with the "Add Area" button
-3. Configure each area:
-   - **Label**: Display name for the area
-   - **ID**: Unique identifier (auto-generated, can be customized)
-   - **Icon**: Visual icon for the area
-   - **Width**: Layout width (Full, Half, Third, etc.)
-   - **Max Items**: Limit number of blocks
-   - **Allowed Collections**: Restrict content types
+With `enableAreaManagement: true`, click **Manage Areas** in the toolbar to add areas and edit each
+area's label, id, icon, color, width, max items, and allowed collections. Saving writes the field's
+options (admin/schema rights required).
 
-### Adding Content Blocks
+### Adding blocks
 
-1. Click the "+" button in an area or use the main add button
-2. Select the content type you want to add
-3. Fill in the content fields
-4. Click "Create" to add the block
+Use **Add block** (or the per-area add control) to open the wizard, which offers three modes:
 
-### Organizing Blocks
+- **Create** a new item inline.
+- **Link existing** — reference an existing content item.
+- **Duplicate existing** — create a copy of an existing item.
 
-**Drag & Drop**:
-- Drag blocks between areas
-- Visual feedback shows valid/invalid drop zones
-- Blocks automatically reorder within areas
+Then fill in the fields and confirm. The block is staged and saved with the form.
 
-**Status Management**:
-- Click the status indicator to change block status
-- Available statuses: Published, Draft, Archived
+### Organizing blocks
 
-**Block Actions**:
-- Edit: Click the block or use the edit button
-- Duplicate: Create a copy of the block
-- Delete: Remove the block (with confirmation)
+- **Drag & drop (pointer)** — move a block between areas or reorder within an area. Invalid moves
+  are blocked by area constraints (`allowedTypes`, `maxItems`, lock).
+- **Drag & drop (keyboard)** — focus a block, then:
+  - **Enter / Space** — grab or drop
+  - **Arrow Up / Down** — reorder within the current area
+  - **Arrow Left / Right** — move to the previous / next eligible area
+  - **Escape** — cancel and restore the original position
+- **Edit** — open a block to edit its item in a drawer; changes are **staged** and persisted on Save.
+- **Status** — when the block's collection has a `status` field, the status badge is clickable
+  (with `update` permission) to switch Published / Draft / Archived; the change is staged.
+- **Duplicate** — create a copy of a block's item.
+- **Remove** — opens a menu with two choices:
+  - **Unassign from this page** — removes the block from this layout only (unlink). The item stays
+    in its collection and on any other pages that use it.
+  - **Delete everywhere** — permanently deletes the underlying item. Shown only when you have
+    `delete` permission on the block's collection.
 
-### Handling Orphaned Blocks
+### Filtering by area
 
-When areas are removed or their rules change, affected blocks are moved to an "Orphaned Blocks" area:
-- Orphaned blocks can be dragged to valid areas
-- The orphaned area appears only when needed
-- Blocks cannot be dragged INTO the orphaned area
+The toolbar's **area selector** (shows "All areas" by default) focuses the view on a single area
+and displays the block count per area.
 
-## Architecture Documentation
+### Orphaned blocks
 
-### Component Structure
+When an area is removed or its rules change, affected blocks move to a system **Orphaned** area:
+- The orphaned area appears only when needed and is locked (cannot be deleted).
+- Drag orphaned blocks into a valid area to resolve them; you cannot drag blocks *into* it.
+
+## Project Structure
 
 ```
 layout-blocks/
 ├── src/
 │   ├── components/
-│   │   ├── AreaManager.vue      # Area configuration UI
-│   │   ├── BlockCreator.vue     # Block creation modal
-│   │   ├── BlockItem.vue        # Individual block component
-│   │   ├── EmptyState.vue       # Empty state display
-│   │   ├── GridView.vue         # Grid layout view
-│   │   ├── ListView.vue         # List/table view
-│   │   └── StatusSelector.vue   # Status dropdown component
+│   │   ├── AddBlockDropdown.vue          # Per-area "add block" control
+│   │   ├── AreaDeleteConfirm.vue         # Confirm dialog for deleting an area
+│   │   ├── AreaManager.vue               # Area configuration UI
+│   │   ├── BlockCreator.vue              # Add-block wizard (create / link / duplicate)
+│   │   ├── BlockItem.vue                 # Individual block rendering
+│   │   ├── DeleteConfirmationDialog.vue  # Generic delete confirmation
+│   │   ├── EmptyState.vue                # Empty-area / empty-list state
+│   │   ├── GridView.vue                  # Grid layout view (incl. inline drag & drop)
+│   │   ├── ListView.vue                  # List/table view (incl. inline drag & drop)
+│   │   └── StatusSelector.vue            # Status display/selector
 │   ├── composables/
-│   │   ├── useAutoSetup.ts      # Auto-setup junction fields
-│   │   ├── useBlocks.ts         # Block CRUD operations
-│   │   ├── useDragDrop.ts       # Drag & drop logic
-│   │   ├── useJunctionDetection.ts # M2A structure detection
-│   │   └── usePermissions.ts    # Permission checking
+│   │   ├── useAutoSetup.ts               # Auto-create area/sort junction fields
+│   │   ├── useBlockPermissions.ts        # Per-action permission helpers
+│   │   ├── useBlocks.ts                  # Block state + emit serialization
+│   │   ├── useKeyboardDnd.ts             # Keyboard drag & drop
+│   │   └── usePermissions.ts             # Permission lookup
+│   ├── config/
+│   │   └── areas.ts                      # Default/area helpers
+│   ├── directives/
+│   │   └── btnAria.ts                    # ARIA pass-through for v-button
+│   ├── services/
+│   │   ├── api-client.ts                 # API wrapper
+│   │   └── api-client.types.ts
 │   ├── types/
-│   │   └── index.ts             # TypeScript definitions
+│   │   └── index.ts                      # TypeScript definitions
 │   ├── utils/
-│   │   ├── blockHelpers.ts      # Block utility functions
-│   │   ├── constants.ts         # App constants
-│   │   ├── logger.ts            # Debug logging
-│   │   └── validators.ts        # Input validation
-│   ├── interface.vue            # Main interface component
-│   └── index.ts                 # Extension entry point
+│   │   ├── blockHelpers.ts               # Block-related helpers (icons, labels)
+│   │   ├── constants.ts                  # Defaults & constants
+│   │   ├── helpers.ts                    # General helpers (temp ids, etc.)
+│   │   ├── logger.ts / logger-wrapper.ts # Debug logging
+│   │   ├── m2a-helper.ts                 # M2A structure analysis + data loading
+│   │   ├── validation.ts                 # Input validation
+│   │   └── validators.ts                 # Area-config validation
+│   ├── interface.vue                     # Main interface component (orchestrator)
+│   └── index.ts                          # Extension entry point
 ├── package.json
 └── README.md
 ```
 
-### Data Flow
+### Data flow
 
-1. **Initialization**:
-   ```
-   interface.vue (mounted)
-     → useJunctionDetection (detect M2A structure)
-     → useAutoSetup (ensure required fields)
-     → useBlocks (load existing blocks)
-     → Initialize UI state
-   ```
-
-2. **Block Creation**:
-   ```
-   User Action → BlockCreator
-     → Create item in content collection
-     → Create junction record
-     → Update local state
-     → Emit update event
-   ```
-
-3. **Drag & Drop**:
-   ```
-   DragStart → useDragDrop
-     → Validate drop targets
-     → Visual feedback
-     → On drop: Update junction record
-     → Reorder blocks in area
-   ```
-
-### State Management
-
-The extension uses Vue 3's Composition API for state management:
-
-- **Local State**: Each component manages its own UI state
-- **Shared State**: Block data flows down through props
-- **Updates**: Child components emit events, parent handles API calls
-- **Reactivity**: Vue's reactive system ensures UI updates
-
-### API Integration
-
-All API calls go through Directus SDK:
-
-```typescript
-// Create block
-await api.post(`/items/${collection}`, itemData);
-await api.post(`/items/${junctionCollection}`, junctionData);
-
-// Update block
-await api.patch(`/items/${collection}/${id}`, updates);
-
-// Delete block
-await api.delete(`/items/${junctionCollection}/${junctionId}`);
-```
+1. **Initialization** — `interface.vue` (mounted) → `M2AHelper.analyzeM2AStructure()` (`utils/m2a-helper.ts`, detect junction + allowed collections) → `useAutoSetup` (ensure `area`/`sort`) → `useBlocks.loadBlocks()` (read existing blocks) → render.
+2. **Block actions** — the wizard / views call `useBlocks` (`addBlock`, `linkExistingItem`, `duplicateExistingItem`, `updateBlock`, `moveBlock`, `reorderBlocks`, `unlinkBlock`, `deleteBlock`); state changes trigger `emit('input', prepareItemsForEmit())`.
+3. **Persistence** — Directus' Save writes the emitted M2A value; Discard re-triggers `loadBlocks()`.
 
 ## API Reference
 
-### Main Interface Props
+### Interface props
 
 ```typescript
-interface Props {
-  value: any[];                    // M2A field value
-  field: string;                   // Field name
-  collection: string;              // Parent collection
-  primaryKey: string | number;     // Parent item ID
-  disabled?: boolean;              // Read-only mode
-  options?: LayoutBlocksOptions;   // Interface options
+// As defined in interface.vue
+{
+  value:      any[];              // M2A field value
+  field:      string;             // Field name
+  collection: string;             // Parent collection
+  primaryKey: string | number;    // Parent item id
+  disabled?:  boolean;            // Read-only mode (default false)
+  options?:   LayoutBlocksOptions;// Interface options (default {})
 }
 ```
 
 ### Events
 
 ```typescript
-// Emitted when blocks change
-emit('input', updatedBlocks);
+// The interface emits a single 'input' event with the serialized M2A array
+emit('input', prepareItemsForEmit());
 ```
 
-### Composables
-
-#### useBlocks
+### `useBlocks` composable
 
 ```typescript
 const {
-  blocks,        // Ref<BlockItem[]>
-  loading,       // Ref<boolean>
-  loadBlocks,    // () => Promise<void>
-  createBlock,   // (area, collection, item) => Promise<BlockItem>
-  updateBlock,   // (id, updates) => Promise<void>
-  moveBlock,     // (id, fromArea, toArea, index) => Promise<void>
-  removeBlock,   // (id) => Promise<void>
-  duplicateBlock // (id) => Promise<BlockItem>
+  blocks,                 // ComputedRef<BlockItem[]>
+  loading,                // ComputedRef<boolean>
+  error,                  // ComputedRef<unknown>
+  isInternalUpdate,       // Ref<boolean> (emit/reload re-entrancy guard)
+  loadBlocks,             // () => Promise<void>
+  getBlocksForArea,       // (areaId) => BlockItem[]
+  addBlock,               // stage a new inline block
+  linkExistingItem,       // stage a link to an existing item
+  duplicateExistingItem,  // stage a duplicate of an existing item
+  updateBlock,            // update a block's area/sort
+  unlinkBlock,            // remove the junction link
+  deleteBlock,            // unlink (+ hard-delete the item when requested)
+  reorderBlocks,          // resequence sort within an area
+  moveBlock,              // move a block to another area
+  markBlockDirty,         // flag a block as changed (for emit)
+  prepareItemsForEmit     // serialize blocks to the M2A form value
 } = useBlocks(collection, field, primaryKey, junctionInfo, options);
 ```
 
-#### useDragDrop
-
-```typescript
-const {
-  draggedBlock,
-  handleDragStart,
-  handleDragEnd,
-  handleDragOver,
-  handleDragLeave,
-  handleDrop,
-  canDropInArea
-} = useDragDrop(blocks, areas, { onMove });
-```
+> Drag-and-drop is implemented inline in `GridView.vue` / `ListView.vue` (with `useKeyboardDnd`
+> for keyboard interaction); there is no separate drag-and-drop composable.
 
 ## Development Guide
 
-### Setting Up Development Environment
+```bash
+npm install        # install dependencies (pnpm is used in the monorepo)
+npm run build      # build dist/index.js
+npm run dev        # build in watch mode
+```
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Adding a new block type
 
-3. Build the extension:
-   ```bash
-   npm run build
-   ```
+1. Create the content collection in Directus.
+2. Add it to the M2A relationship's allowed collections.
+3. *(Optional)* add an icon mapping in `utils/constants.ts` (`COLLECTION_ICONS`).
 
-4. For development with watch mode:
-   ```bash
-   npm run dev
-   ```
+### Debug logging
 
-### Adding New Block Types
+The bundled logger is on by default. See `utils/logger.ts` / `utils/logger-wrapper.ts`.
 
-1. Create your content collection in Directus
-2. Add the collection to the M2A relationship
-3. (Optional) Add icon mapping in `utils/constants.ts`:
-   ```typescript
-   export const COLLECTION_ICONS: Record<string, string> = {
-     // ...existing icons
-     'content_your_type': 'your_icon'
-   };
-   ```
+## Limitations & Not Yet Implemented
 
-### Extending the Interface
-
-To add new features:
-
-1. **New View Mode**: 
-   - Create component in `components/`
-   - Add to `VIEW_MODES` constant
-   - Update view switching logic
-
-2. **New Block Actions**:
-   - Add handler in `useBlocks` composable
-   - Add UI in BlockItem component
-   - Emit appropriate events
-
-3. **New Area Features**:
-   - Update `AreaConfig` type
-   - Add UI in AreaManager
-   - Implement logic in GridView/ListView
-
-### Code Style Guide
-
-- Use TypeScript for all new code
-- Follow Vue 3 Composition API patterns
-- Use `<script setup>` syntax
-- Maintain consistent naming:
-  - Components: PascalCase
-  - Composables: use* prefix
-  - Utils: camelCase
-  - Events: kebab-case
+- **Nested M2A** — the data layer detects and loads nested M2A (up to depth 3), but there is **no
+  nested rendering/editing UI**; only top-level blocks are shown.
+- **Not on npm** — install manually for now.
 
 ## Troubleshooting
 
-### Common Issues
+**Blocks don't appear**
+- Check the M2A relationship and its allowed collections.
+- Verify the junction has `area` and `sort` fields (auto-created by `autoSetup`, or add them manually).
+- A 403 on load is logged (not shown) — confirm the role has **read** on the junction. Check the browser console.
 
-**Blocks not appearing**:
-- Check M2A relationship configuration
-- Verify junction collection has `area` and `sort` fields
-- Check browser console for API errors
+**"Setup Error" on open**
+- `autoSetup` tried to create fields without rights. Open once as an admin (or pre-create the
+  junction fields and set `autoSetup: false`). See [Permissions](#permissions--production-setup).
 
-**Drag & drop not working**:
-- Ensure `enableDragDrop` is true
-- Check if areas have `locked: true`
-- Verify area constraints (allowedTypes, maxItems)
+**Can't add blocks (save fails)**
+- The role is missing **create** on the junction collection (and/or create on the block collection
+  for inline creation). See the permissions table.
 
-**Area changes not saving**:
-- Check user permissions for field updates
-- Verify no validation errors in area configuration
-- Check network tab for API errors
+**Drag & drop not working**
+- Ensure `enableDragDrop: true`, the target area isn't `locked`, and the move satisfies
+  `allowedTypes` / `maxItems`.
 
-**Orphaned blocks appearing**:
-- This is normal when areas are removed or rules change
-- Drag blocks to valid areas to resolve
-- Blocks remain accessible and can be reorganized
+**Area changes not saving**
+- Saving areas needs admin/schema rights (`PATCH /fields`). See Permissions.
 
-### Debug Mode
+## Roadmap
 
-Enable debug logging by editing `utils/logger.ts`:
+**Done**
+- Native Save / Discard integration (changes flow through the form, not direct writes).
+- Keyboard drag-and-drop.
+- Add by create / link / duplicate.
 
-```typescript
-const DEBUG = true; // Set to true for console logs
-```
-
-### Performance Tips
-
-- Use `compactMode` for large numbers of blocks
-- Consider pagination for collections with many items
-- Limit allowed collections to reduce API calls
-- Use list view for better performance with many blocks
+**Planned**
+- Publish to npm.
+- Nested M2A rendering/editing.
+- Block templates.
+- Performance work for large block sets.
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome:
 
-1. Fork the repository
-2. Create a feature branch
-3. Follow the code style guide
-4. Add tests if applicable
-5. Submit a pull request
+1. Fork the repository.
+2. Create a feature branch.
+3. Follow the existing code style (TypeScript, Vue 3 `<script setup>`).
+4. Add tests where applicable.
+5. Open a pull request.
 
 ## License
 
-This extension is released under the MIT License.
+Released under the MIT License.
