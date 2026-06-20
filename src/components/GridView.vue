@@ -90,16 +90,28 @@
                 @dragend="handleDragEnd"
                 @keydown="handleBlockKeydown($event, block)"
               />
-              <InlineBlockEditor
-                v-if="options.editMode === 'inline' && editingBlockId === block.id"
-                :id="`lb-inline-editor-${block.id}`"
-                :collection="editingCollection || block.collection || ''"
-                :primary-key="editingPrimaryKey ?? '+'"
-                :model-value="block.item || {}"
-                :disabled="editDisabled"
-                @update:model-value="$emit('update-block-item', block.id, $event)"
-                @cancel="$emit('cancel-inline')"
-              />
+              <transition
+                :css="false"
+                @enter="onEnter"
+                @leave="onLeave"
+                @enter-cancelled="onEnterCancelled"
+                @leave-cancelled="onLeaveCancelled"
+              >
+                <div
+                  v-if="options.editMode === 'inline' && editingBlockId === block.id"
+                  class="lb-inline-anim"
+                >
+                  <InlineBlockEditor
+                    :id="`lb-inline-editor-${block.id}`"
+                    :collection="editingCollection || block.collection || ''"
+                    :primary-key="editingPrimaryKey ?? '+'"
+                    :model-value="block.item || {}"
+                    :disabled="editDisabled"
+                    @update:model-value="$emit('update-block-item', block.id, $event)"
+                    @cancel="$emit('cancel-inline')"
+                  />
+                </div>
+              </transition>
             </div>
           </transition-group>
 
@@ -159,6 +171,7 @@ import InlineBlockEditor from './InlineBlockEditor.vue';
 import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
 import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
+import { useInlineExpand } from '../composables/useInlineExpand';
 import type { InlineEditViewProps, InlineEditViewEmits } from '../types/inline-edit-view';
 
 // Props
@@ -173,6 +186,10 @@ interface Props {
 }
 
 const props = defineProps<Props & InlineEditViewProps>();
+
+// Inline-editor expand/collapse animation. In the grid the transition element
+// IS the sized wrapper (.lb-inline-anim), so no inner selector is needed.
+const { onEnter, onLeave, onEnterCancelled, onLeaveCancelled } = useInlineExpand();
 
 // Number of skeleton placeholders shown per area while blocks are loading.
 const SKELETON_ROWS = 3;
@@ -696,9 +713,13 @@ function handleAddBlock(areaId: string) {
 .lb-block-wrap {
   display: block;
 
-  /* The inline editor sits directly under its card as one accordion row. */
-  > .lb-inline-editor {
-    margin-top: 8px;
+  /* The inline editor sits directly under its card as one accordion row. The
+     8px gap lives INSIDE the animated wrapper (padding, not margin) with
+     border-box sizing, so it collapses with the height animation instead of
+     leaving a stray gap below the card while closing. */
+  > .lb-inline-anim {
+    box-sizing: border-box;
+    padding-top: 8px;
   }
 }
 

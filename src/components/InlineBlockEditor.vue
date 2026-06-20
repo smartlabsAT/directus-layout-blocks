@@ -54,8 +54,11 @@ const root = ref<HTMLElement | null>(null);
 const collectionLabel = computed(() => getCollectionLabel(props.collection));
 
 // Move focus into the editor region on open (keyboard/SR users land here).
+// preventScroll: focus runs while the inline-expand animation still has the
+// editor at height:0 — without it the browser scrolls to reveal the 0px target,
+// jumping the page when a block low in a long list is opened.
 onMounted(() => {
-  root.value?.focus();
+  root.value?.focus({ preventScroll: true });
 });
 </script>
 
