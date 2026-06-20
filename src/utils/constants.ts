@@ -14,6 +14,7 @@ export const DEFAULT_OPTIONS = {
   enableDragDrop: true,
   showEmptyAreas: true,
   viewMode: 'grid' as const,
+  editMode: 'drawer' as const,
   compactMode: false,
   fullWidth: false,
   autoSetup: true,
@@ -28,6 +29,11 @@ export const FIELD_NAME_ALTERNATIVES = {
 export const VIEW_MODES = {
   GRID: 'grid',
   LIST: 'list'
+} as const;
+
+export const EDIT_MODES = {
+  DRAWER: 'drawer',
+  INLINE: 'inline'
 } as const;
 
 export const DRAG_ANIMATION_DURATION = 200;

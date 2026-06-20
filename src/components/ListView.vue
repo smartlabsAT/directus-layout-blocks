@@ -81,7 +81,7 @@
         <table class="blocks-table" role="grid">
           <thead>
             <tr role="row">
-              <th v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === ORPHANED_AREA_ID)" role="columnheader" style="width: 40px"></th>
+              <th v-if="showDragColumn" role="columnheader" style="width: 40px"></th>
               <th role="columnheader" style="width: 40px"></th>
               <th role="columnheader">
                 <div class="header-with-icon">
@@ -101,7 +101,7 @@
                   <span>Status</span>
                 </div>
               </th>
-              <th v-if="selectedArea === null || selectedArea === ORPHANED_AREA_ID" role="columnheader" style="width: 15%">
+              <th v-if="showAreaColumn" role="columnheader" style="width: 15%">
                 <div class="header-with-icon">
                   <v-icon name="dashboard" small />
                   <span>Area</span>
@@ -116,117 +116,154 @@
             </tr>
           </thead>
           <tbody>
-            <tr
+            <template
               v-for="block in selectedAreaBlocks"
               :key="block.id"
-              class="block-row"
-              :class="{ 'kb-grabbed': kbIsGrabbed(block.id) }"
-              role="row"
             >
-              <td v-if="options.enableDragDrop && (!selectedAreaConfig?.locked || selectedArea === ORPHANED_AREA_ID)" role="gridcell" class="drag-cell">
-                <div
-                  class="drag-handle"
-                  role="button"
-                  tabindex="0"
-                  aria-roledescription="sortable"
-                  :aria-label="`Reorder ${getBlockTitle(block)}`"
-                  :data-block-id="block.id"
-                  :draggable="true"
-                  @dragstart="handleDragStart($event, block)"
-                  @dragend="handleDragEnd"
-                  @keydown="handleBlockKeydown($event, block)"
-                >
-                  <v-icon name="drag_handle" />
-                </div>
-              </td>
-              
-              <td role="gridcell" class="icon-cell">
-                <v-icon :name="getBlockIcon(block)" />
-              </td>
-              
-              <td role="gridcell" class="title-cell">
-                <div class="block-title-cell">
-                  <strong>{{ getBlockTitle(block) }}</strong>
-                  <div v-if="getBlockSubtitle(block)" class="subtitle">
-                    {{ getBlockSubtitle(block) }}
+              <tr
+                class="block-row"
+                :class="{ 'kb-grabbed': kbIsGrabbed(block.id) }"
+                role="row"
+              >
+                <td v-if="showDragColumn" role="gridcell" class="drag-cell">
+                  <div
+                    class="drag-handle"
+                    role="button"
+                    tabindex="0"
+                    aria-roledescription="sortable"
+                    :aria-label="`Reorder ${getBlockTitle(block)}`"
+                    :data-block-id="block.id"
+                    :draggable="true"
+                    @dragstart="handleDragStart($event, block)"
+                    @dragend="handleDragEnd"
+                    @keydown="handleBlockKeydown($event, block)"
+                  >
+                    <v-icon name="drag_handle" />
                   </div>
-                </div>
-              </td>
+                </td>
               
-              <td role="gridcell" class="type-cell">
-                <v-chip small>{{ getCollectionLabel(block) }}</v-chip>
-              </td>
+                <td role="gridcell" class="icon-cell">
+                  <span class="lb-icon-cell-inner">
+                    <v-icon :name="getBlockIcon(block)" />
+                    <block-dirty-dot v-if="isBlockDirty && isBlockDirty(block.id)" :is-new="isTempId(block.id)" />
+                  </span>
+                </td>
               
-              <td role="gridcell" class="status-cell">
-                <status-selector
-                  v-if="block.item"
-                  :status="block.item.status"
-                  :editable="permissions.update"
-                  @update:status="updateBlockStatus(block, $event)"
-                />
-              </td>
+                <td role="gridcell" class="title-cell">
+                  <div class="block-title-cell">
+                    <strong>{{ getBlockTitle(block) }}</strong>
+                    <div v-if="getBlockSubtitle(block)" class="subtitle">
+                      {{ getBlockSubtitle(block) }}
+                    </div>
+                  </div>
+                </td>
               
-              <td v-if="selectedArea === null || selectedArea === ORPHANED_AREA_ID" role="gridcell" class="area-cell">
-                <v-chip 
-                  v-if="getAreaForBlock(block)"
-                  small
-                  :style="getAreaChipStyle(block)"
-                >
-                  <v-icon
-                    v-if="getAreaForBlock(block)?.icon"
-                    :name="getAreaForBlock(block).icon"
-                    x-small
-                    left
+                <td role="gridcell" class="type-cell">
+                  <v-chip small>{{ getCollectionLabel(block) }}</v-chip>
+                </td>
+              
+                <td role="gridcell" class="status-cell">
+                  <status-selector
+                    v-if="block.item"
+                    :status="block.item.status"
+                    :editable="permissions.update"
+                    @update:status="updateBlockStatus(block, $event)"
                   />
-                  {{ getAreaForBlock(block)?.label || block.area }}
-                </v-chip>
-                <v-chip v-else small class="orphaned-chip">
-                  <v-icon name="warning" x-small left />
-                  {{ block.area || 'None' }}
-                </v-chip>
-              </td>
+                </td>
               
-              <td role="gridcell" class="actions-cell">
-                <div class="actions-wrapper">
-                  <v-button
-                    v-if="permissions.update"
-                    v-tooltip="'Edit'"
-                    v-btn-aria="{ 'aria-label': 'Edit block' }"
-                    icon
-                    x-small
-                    secondary
-                    @click="$emit('update-block', { blockId: block.id })"
+                <td v-if="showAreaColumn" role="gridcell" class="area-cell">
+                  <v-chip 
+                    v-if="getAreaForBlock(block)"
+                    small
+                    :style="getAreaChipStyle(block)"
                   >
-                    <v-icon name="edit" />
-                  </v-button>
+                    <v-icon
+                      v-if="getAreaForBlock(block)?.icon"
+                      :name="getAreaForBlock(block).icon"
+                      x-small
+                      left
+                    />
+                    {{ getAreaForBlock(block)?.label || block.area }}
+                  </v-chip>
+                  <v-chip v-else small class="orphaned-chip">
+                    <v-icon name="warning" x-small left />
+                    {{ block.area || 'None' }}
+                  </v-chip>
+                </td>
+              
+                <td role="gridcell" class="actions-cell">
+                  <div class="actions-wrapper">
+                    <v-button
+                      v-if="permissions.update"
+                      v-tooltip="'Edit'"
+                      v-btn-aria="{ 'aria-label': 'Edit block', 'aria-expanded': editingBlockId === block.id }"
+                      icon
+                      x-small
+                      secondary
+                      :class="{ active: editingBlockId === block.id }"
+                      @click="$emit('update-block', { blockId: block.id })"
+                    >
+                      <v-icon name="edit" />
+                    </v-button>
 
-                  <v-button
-                    v-if="permissions.create"
-                    v-tooltip="'Duplicate'"
-                    v-btn-aria="{ 'aria-label': 'Duplicate block' }"
-                    icon
-                    x-small
-                    secondary
-                    @click="$emit('duplicate-block', block.id)"
-                  >
-                    <v-icon name="content_copy" />
-                  </v-button>
+                    <v-button
+                      v-if="permissions.update && isBlockDirty && isBlockDirty(block.id) && !isTempId(block.id)"
+                      v-tooltip="'Revert changes'"
+                      v-btn-aria="{ 'aria-label': 'Revert changes' }"
+                      icon
+                      x-small
+                      secondary
+                      @click="$emit('revert-block', block.id)"
+                    >
+                      <v-icon name="undo" />
+                    </v-button>
 
-                  <v-button
-                    v-if="permissions.delete"
-                    v-tooltip="'Remove'"
-                    v-btn-aria="{ 'aria-label': 'Remove block' }"
-                    icon
-                    x-small
-                    secondary
-                    class="danger"
-                    @click="openDeleteDialog(block)"
-                  >
-                    <v-icon name="delete" />
-                  </v-button>
-                </div>
-              </td>
-            </tr>
+                    <v-button
+                      v-if="permissions.create"
+                      v-tooltip="'Duplicate'"
+                      v-btn-aria="{ 'aria-label': 'Duplicate block' }"
+                      icon
+                      x-small
+                      secondary
+                      @click="$emit('duplicate-block', block.id)"
+                    >
+                      <v-icon name="content_copy" />
+                    </v-button>
+
+                    <v-button
+                      v-if="permissions.delete"
+                      v-tooltip="'Remove'"
+                      v-btn-aria="{ 'aria-label': 'Remove block' }"
+                      icon
+                      x-small
+                      secondary
+                      class="danger"
+                      @click="openDeleteDialog(block)"
+                    >
+                      <v-icon name="delete" />
+                    </v-button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr
+                v-if="options.editMode === 'inline' && editingBlockId === block.id"
+                class="lb-inline-edit-row"
+                role="row"
+              >
+                <td :colspan="columnCount" role="gridcell">
+                  <InlineBlockEditor
+                    :id="`lb-inline-editor-${block.id}`"
+                    :collection="editingCollection || block.collection || ''"
+                    :primary-key="editingPrimaryKey ?? '+'"
+                    :model-value="block.item || {}"
+                    :disabled="editDisabled"
+                    @update:model-value="$emit('update-block-item', block.id, $event)"
+                    @cancel="$emit('cancel-inline')"
+                  />
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -277,7 +314,10 @@ import AddBlockDropdown from './AddBlockDropdown.vue';
 import StatusSelector from './StatusSelector.vue';
 import EmptyState from './EmptyState.vue';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
+import InlineBlockEditor from './InlineBlockEditor.vue';
+import BlockDirtyDot from './BlockDirtyDot.vue';
 import { createDragImage, getBlockIcon } from '../utils/blockHelpers';
+import { isTempId } from '../utils/helpers';
 import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
 import { vBtnAria } from '../directives/btnAria';
@@ -288,6 +328,7 @@ import type {
   LayoutBlocksOptions,
   UserPermissions
 } from '../types';
+import type { InlineEditViewProps, InlineEditViewEmits } from '../types/inline-edit-view';
 
 // Props
 interface Props {
@@ -300,7 +341,7 @@ interface Props {
   allowedCollections?: string[] | null;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<Props & InlineEditViewProps>();
 
 // Emits
 const emit = defineEmits<{
@@ -318,7 +359,7 @@ const emit = defineEmits<{
   'add-block': [area?: string];
   'create-quick': [data: { area: string; collection: string }];
   'open-selector': [data: { area: string; collection: string }];
-}>();
+} & InlineEditViewEmits>();
 
 // Local State
 const draggedBlock = ref<BlockItem | null>(null);
@@ -366,6 +407,20 @@ const selectedAreaConfig = computed(() => {
   logger.log('🟣 ListView: Selected area config:', config);
   return config;
 });
+
+/* Single source for the two conditional columns, used by the <th>/<td> v-ifs
+   AND the inline detail row's colspan so they can never drift. */
+const showDragColumn = computed(() =>
+  props.options.enableDragDrop &&
+  (!selectedAreaConfig.value?.locked || props.selectedArea === ORPHANED_AREA_ID)
+);
+
+const showAreaColumn = computed(() =>
+  props.selectedArea === null || props.selectedArea === ORPHANED_AREA_ID
+);
+
+/* icon + title + type + status + actions = 5 always-on, + drag, + area. */
+const columnCount = computed(() => 5 + (showDragColumn.value ? 1 : 0) + (showAreaColumn.value ? 1 : 0));
 
 const selectedAreaBlocks = computed(() => {
   if (props.selectedArea === null) {
@@ -587,6 +642,7 @@ function updateBlockStatus(block: BlockItem, newStatus: string) {
 // Drag & Drop
 function handleDragStart(event: DragEvent, block: BlockItem) {
   draggedBlock.value = block;
+  emit('grab-start', block.id);
   event.dataTransfer!.effectAllowed = 'move';
   event.dataTransfer!.setData('block-id', block.id.toString());
   event.dataTransfer!.setData('block-area', block.area || '');
@@ -986,6 +1042,20 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
       --v-button-color-hover: var(--theme--danger);
     }
   }
+}
+
+/* Inline-edit detail row: strip cell chrome so the editor fills the row.
+   It is a SIBLING of .block-row, so the .block-row td rules never match it. */
+.lb-inline-edit-row > td {
+  padding: 0;
+  border-right: none;
+  background-color: var(--theme--background-subdued);
+}
+
+/* Positioning context for the dirty-dot in the icon cell. */
+.lb-icon-cell-inner {
+  position: relative;
+  display: inline-flex;
 }
 
 .area-footer {

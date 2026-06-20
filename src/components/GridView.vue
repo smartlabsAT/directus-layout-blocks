@@ -63,26 +63,44 @@
             class="blocks-container"
             role="list"
           >
-            <block-item-component
+            <div
               v-for="(block, index) in getAreaBlocks(area.id)"
               :key="block.id"
-              :block="block"
-              :index="index"
-              :area="area"
-              :compact="options.compactMode"
-              :permissions="permissions"
-              :draggable="options.enableDragDrop && (!area.locked || area.id === ORPHANED_AREA_ID)"
-              :grabbed="isBlockGrabbed(block.id)"
-              @edit="$emit('update-block', { blockId: block.id })"
-              @remove="$emit('remove-block', block.id)"
-              @unlink="$emit('unlink-block', block.id)"
-              @delete="$emit('delete-block', block.id, $event)"
-              @duplicate="$emit('duplicate-block', block.id)"
-              @update-status="handleBlockStatusUpdate(block, $event)"
-              @dragstart="handleDragStart($event, block, area)"
-              @dragend="handleDragEnd"
-              @keydown="handleBlockKeydown($event, block)"
-            />
+              class="lb-block-wrap"
+            >
+              <block-item-component
+                :block="block"
+                :index="index"
+                :area="area"
+                :compact="options.compactMode"
+                :permissions="permissions"
+                :inline-edit="options.editMode === 'inline'"
+                :expanded="editingBlockId === block.id"
+                :is-dirty="isBlockDirty?.(block.id) ?? false"
+                :draggable="options.enableDragDrop && (!area.locked || area.id === ORPHANED_AREA_ID)"
+                :grabbed="isBlockGrabbed(block.id)"
+                @edit="$emit('update-block', { blockId: block.id })"
+                @remove="$emit('remove-block', block.id)"
+                @unlink="$emit('unlink-block', block.id)"
+                @delete="$emit('delete-block', block.id, $event)"
+                @duplicate="$emit('duplicate-block', block.id)"
+                @update-status="handleBlockStatusUpdate(block, $event)"
+                @revert="$emit('revert-block', block.id)"
+                @dragstart="handleDragStart($event, block, area)"
+                @dragend="handleDragEnd"
+                @keydown="handleBlockKeydown($event, block)"
+              />
+              <InlineBlockEditor
+                v-if="options.editMode === 'inline' && editingBlockId === block.id"
+                :id="`lb-inline-editor-${block.id}`"
+                :collection="editingCollection || block.collection || ''"
+                :primary-key="editingPrimaryKey ?? '+'"
+                :model-value="block.item || {}"
+                :disabled="editDisabled"
+                @update:model-value="$emit('update-block-item', block.id, $event)"
+                @cancel="$emit('cancel-inline')"
+              />
+            </div>
           </transition-group>
 
           <!-- Empty State (shared EmptyState, dense for the constrained area card) -->
@@ -137,9 +155,11 @@ import type {
 } from '../types';
 import BlockItemComponent from './BlockItem.vue';
 import EmptyState from './EmptyState.vue';
+import InlineBlockEditor from './InlineBlockEditor.vue';
 import { createDragImage, getBlockTitle } from '../utils/blockHelpers';
 import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
+import type { InlineEditViewProps, InlineEditViewEmits } from '../types/inline-edit-view';
 
 // Props
 interface Props {
@@ -152,7 +172,7 @@ interface Props {
   allowedCollections?: string[] | null;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<Props & InlineEditViewProps>();
 
 // Number of skeleton placeholders shown per area while blocks are loading.
 const SKELETON_ROWS = 3;
@@ -195,7 +215,7 @@ const emit = defineEmits<{
   'add-block': [area?: string];
   'create-quick': [data: { area: string; collection: string }];
   'open-selector': [data: { area: string; collection: string }];
-}>();
+} & InlineEditViewEmits>();
 
 // Local State
 const draggedBlock = ref<BlockItem | null>(null);
@@ -227,10 +247,16 @@ function focusBlock(blockId: BlockId): void {
      nodes (leaving ghost + entering card). Focus the one that is NOT leaving. */
   const focusNonLeaving = () => {
     const nodes = rootEl.value?.querySelectorAll(`[data-block-id="${CSS.escape(String(blockId))}"]`);
-    const el = nodes && (Array.from(nodes).find((n) =>
-      !n.classList.contains('block-list-leave-active') &&
-      !n.classList.contains('block-list-leave-to')
-    ) as HTMLElement | undefined);
+    // The transition-group leave classes now sit on the .lb-block-wrap parent
+    // (the transition-group's direct child), not on .block-item — check both.
+    const isLeaving = (n: Element): boolean => {
+      const wrap = n.closest('.lb-block-wrap') ?? n;
+      return wrap.classList.contains('block-list-leave-active') ||
+        wrap.classList.contains('block-list-leave-to') ||
+        n.classList.contains('block-list-leave-active') ||
+        n.classList.contains('block-list-leave-to');
+    };
+    const el = nodes && (Array.from(nodes).find((n) => !isLeaving(n)) as HTMLElement | undefined);
     el?.focus();
   };
   nextTick(focusNonLeaving);          /* fast path (within-area moves) */
@@ -336,7 +362,8 @@ function handleDragStart(event: DragEvent, block: BlockItem, area: AreaConfig) {
 
   draggedBlock.value = block;
   draggedFromArea.value = area;
-  
+  emit('grab-start', block.id);
+
   // Set drag data
   event.dataTransfer!.effectAllowed = 'move';
   event.dataTransfer!.setData('block-id', block.id.toString());
@@ -664,6 +691,15 @@ function handleAddBlock(areaId: string) {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.lb-block-wrap {
+  display: block;
+
+  /* The inline editor sits directly under its card as one accordion row. */
+  > .lb-inline-editor {
+    margin-top: 8px;
+  }
 }
 
 .area-footer {

@@ -3,7 +3,7 @@ import { ref, computed, unref, nextTick, type Ref, type ComputedRef } from 'vue'
 import { cloneDeep, isEqual } from 'lodash-es';
 import { useApi, useStores } from '@directus/extensions-sdk';
 import { M2AHelper } from '../utils/m2a-helper';
-import { generateTempId, isTempId, isExistingLink } from '../utils/helpers';
+import { generateTempId, isTempId, isExistingLink, isNewItemPk } from '../utils/helpers';
 import type {
   BlockItem,
   BlockId,
@@ -44,11 +44,52 @@ export function useBlocks(
   // the interface's value/blocks watchers against feedback loops during our own
   // emit and during loadBlocks().
   const dirtyIds = ref<Set<BlockId>>(new Set());
+  // Linked (existing_) blocks are ALWAYS dirty (temp id), so dirtyIds cannot
+  // distinguish "linked-only" from "linked-and-content-edited". This separate
+  // set marks links whose CONTENT was edited inline, so their source item is
+  // deep-updated on save (instead of emitting only the bare PK).
+  const contentEditedIds = ref<Set<BlockId>>(new Set());
+  // Original (last-loaded) item per block, keyed by String(id). Lets a single
+  // block be reverted to its persisted state before the global Save.
+  const blockOriginals = new Map<string, any>();
   const isInternalUpdate = ref(false);
 
   function markBlockDirty(id: BlockId, dirty = true): void {
     if (dirty) dirtyIds.value.add(id);
     else dirtyIds.value.delete(id);
+  }
+
+  function markContentEdited(id: BlockId): void {
+    contentEditedIds.value.add(id);
+  }
+
+  /**
+   * Live-stage an inline content edit: merge the new values into the block's
+   * item and mark it dirty + content-edited. Used by the inline editor on every
+   * change (no explicit Save — the global Save persists; revertBlock discards).
+   */
+  function updateBlockItem(id: BlockId, values: Record<string, any>): void {
+    const block = blocks.value.find(b => b.id === id);
+    if (!block) return;
+    block.item = { ...block.item, ...values };
+    markBlockDirty(id, true);
+    markContentEdited(id);
+  }
+
+  /**
+   * Revert a single block to its last-loaded (persisted) state, discarding its
+   * staged changes while leaving other blocks' staged changes intact. Returns
+   * false for blocks without an original (new/temp blocks — use delete instead).
+   */
+  function revertBlock(id: BlockId): boolean {
+    const original = blockOriginals.get(String(id));
+    if (original === undefined) return false;
+    const block = blocks.value.find(b => b.id === id);
+    if (!block) return false;
+    block.item = cloneDeep(original);
+    dirtyIds.value.delete(id);
+    contentEditedIds.value.delete(id);
+    return true;
   }
 
   /**
@@ -57,6 +98,7 @@ export function useBlocks(
    */
   function resetTracking(): void {
     dirtyIds.value.clear();
+    contentEditedIds.value.clear();
   }
 
   /**
@@ -79,7 +121,7 @@ export function useBlocks(
 
     // Skip loading if this is a new item
     const pk = unref(primaryKey);
-    if (!pk || pk === '+' || pk === 'new') {
+    if (isNewItemPk(pk)) {
       logger.log('New item detected, skipping block load');
       applyLoaded([]);
       return;
@@ -155,6 +197,10 @@ export function useBlocks(
       existing._raw = fresh._raw;
       return existing;
     });
+
+    // Snapshot the loaded (persisted) item per block as the revert baseline.
+    blockOriginals.clear();
+    for (const b of blocks.value) blockOriginals.set(String(b.id), cloneDeep(b.item));
 
     resetTracking();
     nextTick(() => {
@@ -276,6 +322,7 @@ export function useBlocks(
     // junction row on save (structured-deferred deletion).
     blocks.value = blocks.value.filter(b => b.id !== blockId);
     dirtyIds.value.delete(blockId);
+    contentEditedIds.value.delete(blockId);
 
     // Renumber the remaining blocks in the area with clean integer sorts.
     const remaining = blocks.value.filter(b => b.area === area).sort((a, b) => a.sort - b.sort);
@@ -390,8 +437,12 @@ export function useBlocks(
       if (hasSort) junction[sortField.value] = block.sort;
 
       if (isExistingLink(block.id)) {
-        // Link to existing item → bare PK only.
-        junction[itemField] = block.item?.id ?? block.item;
+        // Linked item: emit bare PK by default (source untouched). When the
+        // content was edited inline, emit the nested item WITH id so Directus
+        // deep-updates the shared source item (issue #77, accepted semantics).
+        junction[itemField] = contentEditedIds.value.has(block.id)
+          ? block.item
+          : (block.item?.id ?? block.item);
       } else if (temp) {
         // Truly new content → nested object without an id (create).
         const { id: _omitId, ...itemData } = block.item || {};
@@ -403,6 +454,16 @@ export function useBlocks(
 
       return junction;
     });
+  }
+
+  /**
+   * True if a block has unsaved (staged) changes pending the global Save:
+   * temp/new blocks (always), content-edited links, or any block marked dirty.
+   * Reads `dirtyIds.value.has()` directly so the reactive Set dependency is
+   * tracked by callers (a per-block predicate, not a copied Set).
+   */
+  function isBlockDirty(id: BlockId): boolean {
+    return isTempId(id) || dirtyIds.value.has(id) || contentEditedIds.value.has(id);
   }
 
   return {
@@ -421,6 +482,10 @@ export function useBlocks(
     reorderBlocks,
     moveBlock,
     markBlockDirty,
+    markContentEdited,
+    isBlockDirty,
+    updateBlockItem,
+    revertBlock,
     prepareItemsForEmit
   };
 }

@@ -254,6 +254,25 @@ export default defineInterface({
       }
     },
     {
+      field: 'editMode',
+      name: 'Edit Mode',
+      type: 'string',
+      meta: {
+        width: 'half',
+        interface: 'select-dropdown',
+        note: 'How a block is edited: in the side Drawer, or expanded Inline in place within the grid/list.',
+        options: {
+          choices: [
+            { text: 'Drawer', value: 'drawer' },
+            { text: 'Inline (expand in place)', value: 'inline' }
+          ]
+        }
+      },
+      schema: {
+        default_value: 'drawer'
+      }
+    },
+    {
       field: 'enableDragDrop',
       name: 'Enable Drag & Drop',
       type: 'boolean',
