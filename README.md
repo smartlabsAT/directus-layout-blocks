@@ -170,6 +170,7 @@ On first open, the extension creates the `area` and `sort` fields on the junctio
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `viewMode` | `'grid' \| 'list'` | `'grid'` | Initial view mode. |
+| `editMode` | `'drawer' \| 'inline'` | `'drawer'` | How a block is edited: side **drawer**, or expanded **inline** in place (single-open accordion). |
 | `compactMode` | `boolean` | `false` | Denser block layout. |
 | `fullWidth` | `boolean` | `false` | Render the editor across the **full form width** (breaks out of the form column; padding preserved). |
 | `enableDragDrop` | `boolean` | `true` | Enable drag-and-drop reordering / moving. |
@@ -439,6 +440,11 @@ Logs are prefixed `[LayoutBlocks]`. See `utils/logger.ts` / `utils/logger-wrappe
 
 - **Nested M2A** — the data layer detects and loads nested M2A (up to depth 3), but there is **no
   nested rendering/editing UI**; only top-level blocks are shown.
+- **Editing a linked existing item edits the source.** Editing a block that links an existing item
+  (inline or via the drawer) and then saving deep-updates the **source item** — the change is visible
+  everywhere that item is linked. Reordering or moving a linked block does **not** change its content,
+  and status changes on a linked block are not persisted to the source. If the same source item is
+  linked twice in one record and both are edited, the two deep-updates race (last write wins).
 - **Not on npm** — install manually for now.
 
 ## Troubleshooting

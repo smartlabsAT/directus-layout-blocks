@@ -4,13 +4,16 @@
     :class="{
       'compact': compact,
       'draggable': draggable,
-      'dragging': grabbed
+      'dragging': grabbed,
+      'expanded': expanded
     }"
     :data-block-id="block.id"
     :draggable="draggable"
     role="listitem"
     tabindex="0"
     :aria-roledescription="draggable ? 'sortable' : undefined"
+    :aria-expanded="inlineEdit ? expanded : undefined"
+    :aria-controls="inlineEdit && expanded ? `lb-inline-editor-${block.id}` : undefined"
     v-bind="$attrs"
     @click.stop="handleClick"
     @dblclick="handleDoubleClick"
@@ -21,6 +24,7 @@
         :name="getBlockIcon(block)" 
         :color="getBlockColor()"
       />
+      <block-dirty-dot v-if="isDirty" :is-new="isNewBlock" />
     </div>
 
     <!-- Block Content -->
@@ -72,6 +76,17 @@
               <v-icon name="edit" />
             </v-list-item-icon>
             <v-list-item-content>Edit</v-list-item-content>
+          </v-list-item>
+
+          <v-list-item
+            v-if="permissions.update && isDirty && !isNewBlock"
+            clickable
+            @click="$emit('revert')"
+          >
+            <v-list-item-icon>
+              <v-icon name="undo" />
+            </v-list-item-icon>
+            <v-list-item-content>Revert changes</v-list-item-content>
           </v-list-item>
 
           <v-list-item
@@ -136,8 +151,10 @@ import { computed, ref } from 'vue';
 import { vBtnAria } from '../directives/btnAria';
 import type { BlockItem, AreaConfig, UserPermissions } from '../types';
 import { getBlockIcon, getBlockTitle, getBlockSubtitle, getCollectionLabel } from '../utils/blockHelpers';
+import { isTempId } from '../utils/helpers';
 import StatusSelector from './StatusSelector.vue';
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue';
+import BlockDirtyDot from './BlockDirtyDot.vue';
 
 // This component has multiple root nodes (the block element + the delete dialog),
 // so Vue cannot auto-inherit fallthrough listeners. Without this, the parent's
@@ -155,13 +172,25 @@ interface Props {
   draggable?: boolean;
   /** True while this block is held in keyboard drag mode (a11y §3). */
   grabbed?: boolean;
+  /** Inline edit mode: a single click toggles the inline editor. */
+  inlineEdit?: boolean;
+  /** True when this block's inline editor is open (single-open accordion). */
+  expanded?: boolean;
+  /** Block has staged, unsaved changes pending the global Save. */
+  isDirty?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   compact: false,
   draggable: true,
-  grabbed: false
+  grabbed: false,
+  inlineEdit: false,
+  expanded: false,
+  isDirty: false
 });
+
+// New/temp block (green dot) vs edited existing block (primary dot).
+const isNewBlock = computed(() => isTempId(props.block.id));
 
 // Emits
 const emit = defineEmits<{
@@ -172,6 +201,7 @@ const emit = defineEmits<{
   duplicate: [];
   click: [];
   'update-status': [status: string];
+  revert: [];
 }>();
 
 // State
@@ -197,7 +227,13 @@ function getBlockColor(): string {
 }
 
 function handleClick() {
-  emit('click');
+  // Inline mode: a single click toggles the inline editor (parent owns the
+  // single-open accordion via editingBlockId). Drawer mode keeps select-on-click.
+  if (props.inlineEdit) {
+    emit('edit');
+  } else {
+    emit('click');
+  }
 }
 
 function handleDoubleClick() {
@@ -285,9 +321,16 @@ function updateStatus(status: string) {
     border-style: dashed;
     cursor: grabbing !important;
   }
+
+  /* Active card whose inline editor is open (matches .grid-area.selected). */
+  &.expanded {
+    border-color: var(--theme--primary);
+    background: var(--theme--primary-background);
+  }
 }
 
 .block-icon {
+  position: relative;
   flex-shrink: 0;
   width: 40px;
   height: 40px;

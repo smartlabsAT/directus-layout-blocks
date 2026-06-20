@@ -181,6 +181,11 @@
           :permissions="permissions"
           :loading="blocksLoading"
           :allowed-collections="filteredCollections"
+          :editing-block-id="editingBlockId"
+          :editing-collection="editingCollection"
+          :editing-primary-key="editingId"
+          :edit-disabled="disabled"
+          :is-block-dirty="isBlockDirty"
           @move-block="handleMoveBlock"
           @remove-block="handleRemoveBlock"
           @unlink-block="handleUnlinkBlock"
@@ -190,6 +195,10 @@
           @add-block="openBlockCreator"
           @create-quick="handleQuickCreate"
           @open-selector="handleOpenSelector"
+          @grab-start="handleInlineGrabStart"
+          @update-block-item="handleInlineItemUpdate"
+          @revert-block="handleRevertBlock"
+          @cancel-inline="handleDrawerCancel"
         />
       </div>
 
@@ -256,6 +265,7 @@
       
       <!-- Edit Drawer mit v-form und eigenen Buttons -->
       <v-drawer
+        v-if="options.editMode !== EDIT_MODES.INLINE"
         v-model="drawerActive"
         :title="editingCollection ? `Edit ${getCollectionLabel(editingCollection)}` : 'Edit Block'"
         :subtitle="editingCollection ? 'Editing in place' : undefined"
@@ -336,9 +346,10 @@ import { useAutoSetup } from './composables/useAutoSetup';
 import { useBlocks } from './composables/useBlocks';
 import { usePermissions } from './composables/usePermissions';
 import { useBlockPermissions } from './composables/useBlockPermissions';
-import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG, ORPHANED_AREA_ID } from './utils/constants';
-import { normalizeAreaIds, isTempId, formatCollectionName } from './utils/helpers';
+import { DEFAULT_OPTIONS, DEFAULT_AREA_CONFIG, ORPHANED_AREA_ID, EDIT_MODES } from './utils/constants';
+import { normalizeAreaIds, isTempId, formatCollectionName, isNewItemPk } from './utils/helpers';
 import { getCollectionIcon } from './utils/blockHelpers';
+import { nextInlineEditTarget } from './utils/inline-edit';
 import { cloneDeep } from 'lodash-es';
 import { CUSTOM_AREAS, USE_CUSTOM_AREAS } from './config/areas';
 import type {
@@ -483,8 +494,11 @@ onMounted(async () => {
         if (fieldConfig?.meta?.options) {
           // Force recompute if we find options
           if (fieldConfig.meta.options.areas && Array.isArray(fieldConfig.meta.options.areas)) {
-            if (options.value.areas?.length === 0 || !options.value.areas) {
-              // Reload blocks which should now use the correct areas
+            if ((options.value.areas?.length === 0 || !options.value.areas)
+              && editingBlockId.value === null
+              && !blocks.value.some(b => isBlockDirty(b.id))) {
+              // Reload blocks which should now use the correct areas — but NEVER
+              // while editing or with unsaved staged changes (would clobber them).
               loadBlocks();
             }
           }
@@ -567,6 +581,36 @@ function restoreOverlayTrigger() {
 watch(showAreaManager, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
 watch(showBlockCreator, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
 watch(drawerActive, (open, was) => { if (open) rememberOverlayTrigger(); else if (was) restoreOverlayTrigger(); });
+
+// Inline editor: close it when a drag of the OPEN block begins (pointer path;
+// keyboard moves are covered by handleMoveBlock). Closes the editor the moment
+// you start dragging it, so it never animates while being dragged.
+function handleInlineGrabStart(blockId: BlockId) {
+  if (editingBlockId.value !== null && String(blockId) === String(editingBlockId.value)) {
+    handleDrawerCancel();
+  }
+}
+
+// Close the inline editor when the view mode switches: <component :is> unmounts
+// the view (no KeepAlive), which would destroy the editor mid-edit, jump focus,
+// and leave editingBlockId set for a block that may be invisible in the other
+// view (issue #77).
+watch(viewMode, () => {
+  if (editingBlockId.value !== null) handleDrawerCancel();
+});
+
+// Inline editor focus restore: remember the block CARD as the restore target
+// (NOT document.activeElement — when opened via the teleported options menu,
+// activeElement is the menu item, which is removed on close → restore would
+// no-op). On close, return focus to the card.
+watch(editingBlockId, (open, was) => {
+  if (open !== null) {
+    const card = document.querySelector(`[data-block-id="${CSS.escape(String(open))}"]`);
+    lastOverlayTrigger.value = card instanceof HTMLElement ? card : null;
+  } else if (was !== null) {
+    restoreOverlayTrigger();
+  }
+});
 
 // Toolbar sticky-shadow: show a subtle shadow under the toolbar only once it is
 // stuck to the top (matching Directus' own header-bar). An IntersectionObserver
@@ -672,9 +716,7 @@ const { checkPermissions } = usePermissions();
 const { permissions: blockPermissions, validation } = useBlockPermissions(options);
 
 // Computed
-const isNewItem = computed(() => 
-  !props.primaryKey || props.primaryKey === '+' || props.primaryKey === 'new'
-);
+const isNewItem = computed(() => isNewItemPk(props.primaryKey));
 
 const viewComponent = computed(() => 
   viewMode.value === 'grid' ? GridView : ListView
@@ -754,6 +796,10 @@ const {
   reorderBlocks,
   moveBlock,
   markBlockDirty,
+  markContentEdited,
+  isBlockDirty,
+  updateBlockItem,
+  revertBlock,
   isInternalUpdate,
   prepareItemsForEmit
 } = useBlocks(
@@ -866,9 +912,12 @@ onMounted(async () => {
             // Since we can't use fieldOptions anymore, we need to force a recompute
             // by triggering a reactive update
             // This is a workaround for the delayed loading issue
-            if (options.value.areas?.length === 0 || !options.value.areas) {
+            if ((options.value.areas?.length === 0 || !options.value.areas)
+              && editingBlockId.value === null
+              && !blocks.value.some(b => isBlockDirty(b.id))) {
               logger.log('🔍 Options were empty, will reload page to apply areas');
               // As a last resort, reload the blocks which should now use the correct areas
+              // (skipped while editing / with unsaved staged changes — would clobber them).
               loadBlocks();
             }
           }
@@ -1034,6 +1083,7 @@ const filteredCollections = computed(() => {
 
 // Open block creator
 function openBlockCreator(area?: string) {
+  if (props.disabled) return;            // read-only interface: no adding
   logger.log('🔵 openBlockCreator called with area:', area);
   logger.log('🔵 Current selectedArea:', selectedArea.value);
   logger.log('🔵 isNewItem:', isNewItem.value);
@@ -1042,7 +1092,7 @@ function openBlockCreator(area?: string) {
   logger.log('🔵 junctionInfo:', junctionInfo.value);
   
   // Direct check for new item
-  const isNew = !props.primaryKey || props.primaryKey === '+' || props.primaryKey === 'new';
+  const isNew = isNewItemPk(props.primaryKey);
   logger.log('🔵 Direct isNew check:', isNew);
   
   if (isNew) {
@@ -1366,6 +1416,13 @@ async function handleMoveBlock(data: {
   toArea: string;
   toIndex: number;
 }) {
+  // Closing the open inline editor before a move prevents it from rendering in
+  // both the leaving ghost AND the entering card during the cross-area
+  // transition-group animation (issue #77).
+  if (editingBlockId.value !== null && String(data.blockId) === String(editingBlockId.value)) {
+    handleDrawerCancel();
+  }
+
   // Compare as strings: drag payloads from the DOM are strings, while persisted
   // blocks carry numeric ids (see fix #40/#42).
   const block = blocks.value.find(b => String(b.id) === String(data.blockId));
@@ -1406,19 +1463,42 @@ async function handleMoveBlock(data: {
 }
 
 async function handleUpdateBlock(data: {
-  blockId: number;
+  blockId: BlockId;
   updates?: any;
 }) {
   logger.log('🔵 handleUpdateBlock called:', data);
-  
-  // If updates are provided, do a direct update without opening drawer
+
+  // Direct status update path (unchanged).
   if (data.updates) {
     await handleBlockStatusUpdate(data.blockId, data.updates.status);
     return;
   }
-  
+
+  // Read-only interface: never open an editor.
+  if (props.disabled) return;
+
+  const inlineMode = options.value.editMode === EDIT_MODES.INLINE;
+
+  // Inline single-open accordion: re-triggering the open block closes it.
+  // No loading/buffer — block.item is already complete from the M2A load (the
+  // junction is fetched with `item.*`) and is edited LIVE: each change stages
+  // straight into the block (dirty), no Save button. Close keeps the edit;
+  // discard is per-block via the block menu's revert.
+  if (inlineMode) {
+    if (nextInlineEditTarget(editingBlockId.value, data.blockId) === null) {
+      handleDrawerCancel();
+      return;
+    }
+    const block = blocks.value.find(b => b.id === data.blockId);
+    if (!block) return;
+    editingCollection.value = block.collection;
+    editingBlockId.value = block.id;
+    editingId.value = (isTempId(block.id) || !block.item?.id) ? '+' : block.item.id;
+    return;
+  }
+
+  // Drawer mode: load the item into the buffer and open the side drawer.
   try {
-    // Find the block to get its collection and item id
     const block = blocks.value.find(b => b.id === data.blockId);
     if (!block) {
       throw new Error('Block not found');
@@ -1432,15 +1512,13 @@ async function handleUpdateBlock(data: {
       editingId.value = '+';
       editingValues.value = cloneDeep(block.item || {});
     } else {
-      // Persisted block: load current item values read-only for the form.
+      // Persisted block: load current item values for the form.
       editingId.value = block.item.id;
       const response = await api.get(`/items/${block.collection}/${block.item.id}`);
       editingValues.value = response.data.data;
     }
 
-    // Open drawer
     drawerActive.value = true;
-
   } catch (error) {
     logger.error('🔴 Error opening editor:', error);
     notifications.add({
@@ -1448,6 +1526,8 @@ async function handleUpdateBlock(data: {
       text: error.message || 'Failed to open block editor',
       type: 'error'
     });
+    // Fully close so no half-open empty inline editor remains.
+    handleDrawerCancel();
   }
 }
 
@@ -1567,6 +1647,7 @@ async function saveBlockDirectly() {
     if (block) {
       block.item = { ...block.item, ...editingValues.value };
       markBlockDirty(block.id, true);
+      markContentEdited(block.id);
     }
 
     notifications.add({
@@ -1594,13 +1675,33 @@ async function saveBlockDirectly() {
   }
 }
 
-// Handle drawer cancel
+// Handle drawer cancel (also used to close the inline accordion).
 function handleDrawerCancel() {
   drawerActive.value = false;
   editingId.value = null;
   editingBlockId.value = null;
   editingCollection.value = '';
   editingValues.value = {};
+}
+
+// Live inline edit: stage the change straight into the block's item (dirty).
+function handleInlineItemUpdate(blockId: BlockId, values: Record<string, any>) {
+  updateBlockItem(blockId, values);
+}
+
+// Revert a single block's staged changes (from the block menu).
+function handleRevertBlock(blockId: BlockId) {
+  if (revertBlock(blockId)) {
+    // If the reverted block's inline editor is open, close it for a clean state.
+    if (editingBlockId.value !== null && String(editingBlockId.value) === String(blockId)) {
+      handleDrawerCancel();
+    }
+    notifications.add({
+      title: 'Changes reverted',
+      text: 'The block was restored to its saved state.',
+      type: 'success'
+    });
+  }
 }
 
 // Get foreign key field for circular reference prevention
@@ -1836,6 +1937,10 @@ watch(blocks, () => {
 // read-only and reset the dirty baseline. Skipped for our own emits.
 watch(() => props.value, () => {
   if (isInternalUpdate.value) return;
+  // A real (Save / Discard / external) reload ends any open edit session — close
+  // the inline editor first so it never points at a stale/replaced block (e.g. a
+  // new block whose temp id became a real id after Save & Stay).
+  if (editingBlockId.value !== null) handleDrawerCancel();
   loadBlocks();
 }, { deep: true });
 </script>

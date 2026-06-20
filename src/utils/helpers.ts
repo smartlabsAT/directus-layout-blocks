@@ -52,6 +52,14 @@ export function isExistingLink(id: unknown): boolean {
 }
 
 /**
+ * Check if a primary key denotes a new (unsaved) item. Directus uses both `'+'`
+ * (current) and the legacy `'new'`; a nullish key is also treated as new.
+ */
+export function isNewItemPk(pk: unknown): boolean {
+  return !pk || pk === '+' || pk === 'new';
+}
+
+/**
  * Format collection name for display
  */
 export function formatCollectionName(collection: string): string {

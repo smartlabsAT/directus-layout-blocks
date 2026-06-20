@@ -289,5 +289,37 @@ describe('useBlocks Composable (global-save / state-based)', () => {
         expect(Number.isInteger(entry.sort)).toBe(true);
       }
     });
+
+    it('emits the nested linked item WITH id when content was edited (deep update)', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: { data: { id: 7, title: 'Linked' } } });
+      const { prepareItemsForEmit, linkExistingItem, markContentEdited, blocks } = await seed([]);
+      await linkExistingItem('main', 'content_text', 7);
+      const id = blocks.value[0].id;          // existing_… temp id
+      blocks.value[0].item.title = 'Edited';  // simulate the staged drawer edit
+      markContentEdited(id);
+      const out = prepareItemsForEmit();
+      expect(out[0]).toMatchObject({
+        collection: 'content_text',
+        area: 'main',
+        item: { id: 7, title: 'Edited' }
+      });
+      expect(out[0]).not.toHaveProperty('id'); // temp junction → no junction id
+    });
+
+    it('keeps the bare PK for a linked block whose item was mutated but NOT content-marked', async () => {
+      // Proves the deep-update gate is markContentEdited, not mere dirtiness: a
+      // linked block is always dirty (temp id) and can even have a locally
+      // mutated item, but without markContentEdited it still emits the bare PK
+      // (source untouched). This is the real counter-test to the positive case.
+      mockApi.get.mockResolvedValueOnce({ data: { data: { id: 7, title: 'Linked' } } });
+      const { prepareItemsForEmit, linkExistingItem, reorderBlocks, blocks } = await seed([]);
+      await linkExistingItem('main', 'content_text', 7);
+      const id = blocks.value[0].id;
+      blocks.value[0].item.title = 'Edited locally';  // mutated, but NOT marked
+      await reorderBlocks('main', [id]);               // dirty, not content-edited
+      const out = prepareItemsForEmit();
+      expect(out[0]).toMatchObject({ collection: 'content_text', area: 'main', item: 7 });
+      expect(out[0].item).toBe(7);                     // bare PK — no deep update
+    });
   });
 });
