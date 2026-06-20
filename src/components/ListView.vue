@@ -246,23 +246,33 @@
                 </td>
               </tr>
 
-              <tr
-                v-if="options.editMode === 'inline' && editingBlockId === block.id"
-                class="lb-inline-edit-row"
-                role="row"
+              <transition
+                :css="false"
+                @enter="onEnter"
+                @leave="onLeave"
+                @enter-cancelled="onEnterCancelled"
+                @leave-cancelled="onLeaveCancelled"
               >
-                <td :colspan="columnCount" role="gridcell">
-                  <InlineBlockEditor
-                    :id="`lb-inline-editor-${block.id}`"
-                    :collection="editingCollection || block.collection || ''"
-                    :primary-key="editingPrimaryKey ?? '+'"
-                    :model-value="block.item || {}"
-                    :disabled="editDisabled"
-                    @update:model-value="$emit('update-block-item', block.id, $event)"
-                    @cancel="$emit('cancel-inline')"
-                  />
-                </td>
-              </tr>
+                <tr
+                  v-if="options.editMode === 'inline' && editingBlockId === block.id"
+                  class="lb-inline-edit-row"
+                  role="row"
+                >
+                  <td :colspan="columnCount" role="gridcell">
+                    <div class="lb-inline-anim">
+                      <InlineBlockEditor
+                        :id="`lb-inline-editor-${block.id}`"
+                        :collection="editingCollection || block.collection || ''"
+                        :primary-key="editingPrimaryKey ?? '+'"
+                        :model-value="block.item || {}"
+                        :disabled="editDisabled"
+                        @update:model-value="$emit('update-block-item', block.id, $event)"
+                        @cancel="$emit('cancel-inline')"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </transition>
             </template>
           </tbody>
         </table>
@@ -320,6 +330,7 @@ import { createDragImage, getBlockIcon } from '../utils/blockHelpers';
 import { isTempId } from '../utils/helpers';
 import { ORPHANED_AREA_ID } from '../utils/constants';
 import { useKeyboardDnd } from '../composables/useKeyboardDnd';
+import { useInlineExpand } from '../composables/useInlineExpand';
 import { vBtnAria } from '../directives/btnAria';
 import type {
   BlockItem,
@@ -342,6 +353,11 @@ interface Props {
 }
 
 const props = defineProps<Props & InlineEditViewProps>();
+
+// Inline-editor expand/collapse animation. The transition element is the <tr>,
+// which cannot be height-animated directly — animate the inner .lb-inline-anim
+// wrapper instead and let the row follow.
+const { onEnter, onLeave, onEnterCancelled, onLeaveCancelled } = useInlineExpand('.lb-inline-anim');
 
 // Emits
 const emit = defineEmits<{
@@ -1050,6 +1066,13 @@ function canDropInArea(block: BlockItem, area: AreaConfig): boolean {
   padding: 0;
   border-right: none;
   background-color: var(--theme--background-subdued);
+}
+
+/* Height-animated wrapper inside the inline-edit cell (see useInlineExpand). The
+   <tr> can't be height-animated, so this inner div is; the row follows it.
+   border-box keeps any future padding inside the measured/animated height. */
+.lb-inline-edit-row .lb-inline-anim {
+  box-sizing: border-box;
 }
 
 /* Positioning context for the dirty-dot in the icon cell. */
