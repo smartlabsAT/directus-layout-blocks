@@ -322,4 +322,25 @@ describe('useBlocks Composable (global-save / state-based)', () => {
       expect(out[0].item).toBe(7);                     // bare PK — no deep update
     });
   });
+
+  describe('revertBlock (per-block discard)', () => {
+    it('restores a block to its loaded original and clears its dirty state', async () => {
+      const { updateBlockItem, revertBlock, isBlockDirty, blocks } = await seed([
+        baseRecord({ id: 10, item: { id: 5, title: 'Original' } })
+      ]);
+      updateBlockItem(10, { title: 'Edited' });
+      expect(blocks.value[0].item.title).toBe('Edited');
+      expect(isBlockDirty(10)).toBe(true);
+
+      expect(revertBlock(10)).toBe(true);
+      expect(blocks.value[0].item.title).toBe('Original');
+      expect(isBlockDirty(10)).toBe(false);
+    });
+
+    it('returns false for a block with no original (a new/temp block)', async () => {
+      const { revertBlock, addBlock, blocks } = await seed([]);
+      await addBlock('main', 'content_text', { title: 'New' });
+      expect(revertBlock(blocks.value[0].id)).toBe(false);
+    });
+  });
 });
