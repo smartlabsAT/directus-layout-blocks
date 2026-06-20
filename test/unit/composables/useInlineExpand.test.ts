@@ -75,4 +75,25 @@ describe('useInlineExpand', () => {
     vi.advanceTimersByTime(INLINE_EXPAND_MS + 80);
     expect(done).toHaveBeenCalledTimes(1);
   });
+
+  it('stops the in-flight enter and clears styles when cancelled (no late resolve)', () => {
+    vi.useFakeTimers();
+    mockReducedMotion(false);
+    const { onEnter, onEnterCancelled } = useInlineExpand();
+    const el = document.createElement('div');
+    const done = vi.fn();
+
+    onEnter(el, done);
+    expect(el.style.overflow).toBe('hidden'); // animation armed
+
+    onEnterCancelled(el);
+
+    // Inline styles are dropped immediately…
+    expect(el.style.height).toBe('');
+    expect(el.style.transition).toBe('');
+    // …and the cancelled enter's safety timer must NOT resolve afterwards
+    // (a stale timer would otherwise clobber a subsequent leave animation).
+    vi.advanceTimersByTime(INLINE_EXPAND_MS + 80);
+    expect(done).not.toHaveBeenCalled();
+  });
 });

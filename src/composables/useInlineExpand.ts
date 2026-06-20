@@ -33,6 +33,11 @@ function prefersReducedMotion(): boolean {
  *   Omit for the grid, where the transition element IS the sized wrapper.
  */
 export function useInlineExpand(targetSelector?: string) {
+  // The in-flight animation's stopper, per element. Lets a new animation (or a
+  // cancel hook) supersede a running one — clearing its timer + listener so a
+  // stale safety timer can never resolve or clobber a later animation.
+  const active = new WeakMap<HTMLElement, () => void>();
+
   // The element whose height we animate (may differ from the transition element).
   function resolveTarget(el: Element): HTMLElement {
     if (targetSelector) {
@@ -51,26 +56,36 @@ export function useInlineExpand(targetSelector?: string) {
     t.style.transition = '';
   }
 
-  // Animate `t` between two explicit heights, fading opacity in step. A fallback
+  // Animate `t` open (`expanding`) or closed, fading opacity in step. A fallback
   // timer guarantees done() even when no `transitionend` fires (height unchanged,
   // zero-height layouts, interrupted transition) so the editor never gets stuck.
-  function animate(t: HTMLElement, from: string, to: string, done: DoneFn): void {
+  function animate(t: HTMLElement, expanding: boolean, done: DoneFn): void {
+    active.get(t)?.(); // supersede any in-flight animation on this element
+
+    const full = `${t.scrollHeight}px`;
     t.style.overflow = 'hidden';
-    t.style.height = from;
-    t.style.opacity = from === '0px' ? '0' : '1';
+    t.style.height = expanding ? '0px' : full;
+    t.style.opacity = expanding ? '0' : '1';
     // Force a reflow so the start values are committed before we transition.
     t.getBoundingClientRect();
     t.style.transition =
       `height ${INLINE_EXPAND_MS}ms ${INLINE_EXPAND_EASING}, opacity ${INLINE_EXPAND_MS}ms ${INLINE_EXPAND_EASING}`;
-    t.style.height = to;
-    t.style.opacity = to === '0px' ? '0' : '1';
+    t.style.height = expanding ? full : '0px';
+    t.style.opacity = expanding ? '1' : '0';
 
     let settled = false;
-    const finish = (): void => {
+    // Stop the timer + listener WITHOUT resolving (used when superseded/cancelled).
+    const stop = (): void => {
       if (settled) return;
       settled = true;
       t.removeEventListener('transitionend', onEnd);
       clearTimeout(timer);
+      if (active.get(t) === stop) active.delete(t);
+    };
+    // Natural completion: stop, restore natural styles, resolve the transition.
+    const finish = (): void => {
+      if (settled) return;
+      stop();
       reset(t);
       done();
     };
@@ -79,23 +94,34 @@ export function useInlineExpand(targetSelector?: string) {
     };
     const timer = setTimeout(finish, INLINE_EXPAND_MS + 80);
     t.addEventListener('transitionend', onEnd);
+    active.set(t, stop);
   }
 
   function onEnter(el: Element, done: DoneFn): void {
     const t = resolveTarget(el);
     if (prefersReducedMotion()) { done(); return; }
-    animate(t, '0px', `${t.scrollHeight}px`, done);
+    animate(t, true, done);
   }
 
   function onLeave(el: Element, done: DoneFn): void {
     const t = resolveTarget(el);
     if (prefersReducedMotion()) { done(); return; }
-    animate(t, `${t.scrollHeight}px`, '0px', done);
+    animate(t, false, done);
   }
 
-  // Interrupted mid-flight (e.g. rapid open→close): drop our inline styles.
-  function onEnterCancelled(el: Element): void { reset(resolveTarget(el)); }
-  function onLeaveCancelled(el: Element): void { reset(resolveTarget(el)); }
+  // Interrupted mid-flight (e.g. rapid open→close, single-open switch A→B): stop
+  // the running animation (so its safety timer cannot fire later) and drop our
+  // inline styles.
+  function onEnterCancelled(el: Element): void {
+    const t = resolveTarget(el);
+    active.get(t)?.();
+    reset(t);
+  }
+  function onLeaveCancelled(el: Element): void {
+    const t = resolveTarget(el);
+    active.get(t)?.();
+    reset(t);
+  }
 
   return { onEnter, onLeave, onEnterCancelled, onLeaveCancelled };
 }
